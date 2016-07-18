@@ -608,6 +608,34 @@ func testImageHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 }
 
+func getSubjectPassImages(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	subjectID, err := strconv.Atoi(ps.ByName("id"))
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	subjectImages, err := models.GetSubjectPassImages(db, subjectID)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse, err := json.Marshal(subjectImages)
+
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
+	w.Write(jsonResponse)
+}
+
 func main() {
 	defer db.Close()
 
@@ -615,6 +643,7 @@ func main() {
 
 	router.POST("/subject/new", newSubjectHandler)
 	router.GET("/subject/profile/:id", getSubjectHandler)
+	router.GET("/subject/images/:id", getSubjectPassImages)
 	router.GET("/subject/list", getSubjectListHandler)
 	router.POST("/subject/save/password", saveSubjectPasswordHandler)
 	router.POST("/subject/save/pin", saveSubjectPinHandler)

@@ -120,3 +120,18 @@ func GetSubjectList(db *sql.DB) []SubjectNameAndId {
 
 	return subjectList
 }
+
+func GetSubjectPassImages(db *sql.DB, subjectId int) ([]string, error) {
+	rows, err := db.Query(`SELECT alias FROM saved_images WHERE subject_id = $1`, subjectId)
+	if (err != nil) {
+		return nil, err
+	}
+	var passImageList []string
+	for rows.Next() {
+		var passImageAlias string
+		err = rows.Scan(&passImageAlias);
+		passImageList = append(passImageList, passImageAlias)
+	}
+
+	return passImageList, err;
+}
