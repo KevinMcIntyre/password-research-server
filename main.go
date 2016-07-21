@@ -596,9 +596,13 @@ func testImageHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	var imageBytes string
 	var imageType string
 	err := db.QueryRow("SELECT image, image_type FROM test_config_stage_images WHERE alias=$1", ps.ByName("alias")).Scan(&imageBytes, &imageType)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if (err != nil) {
+		// We need this for when user images are assigned during the trial setup in order to preview the matrix
+		err = db.QueryRow("SELECT image, image_type FROM saved_images WHERE alias=$1", ps.ByName("alias")).Scan(&imageBytes, &imageType)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	buffer := bytes.NewBufferString(imageBytes)
 	w.Header().Set("Content-Type", imageType)
