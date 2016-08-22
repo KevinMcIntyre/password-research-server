@@ -596,7 +596,7 @@ func testImageHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	var imageBytes string
 	var imageType string
 	err := db.QueryRow("SELECT image, image_type FROM test_config_stage_images WHERE alias=$1", ps.ByName("alias")).Scan(&imageBytes, &imageType)
-	if (err != nil) {
+	if err != nil {
 		// We need this for when user images are assigned during the trial setup in order to preview the matrix
 		err = db.QueryRow("SELECT image, image_type FROM saved_images WHERE alias=$1", ps.ByName("alias")).Scan(&imageBytes, &imageType)
 		if err != nil {
@@ -640,6 +640,37 @@ func getSubjectPassImages(w http.ResponseWriter, r *http.Request, ps httprouter.
 	w.Write(jsonResponse)
 }
 
+func testSettingSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	decoder := json.NewDecoder(r.Body)
+	var configSaveRequest models.Config
+	err := decoder.Decode(&configSaveRequest)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	fmt.Println(configSaveRequest)
+	// err = configSaveRequest.Save(db)
+	var jsonArray []string
+
+	if err != nil {
+		jsonArray = append(jsonArray, err.Error())
+	} else {
+		jsonArray = append(jsonArray, "swag")
+	}
+
+	jsonResponse, err := json.Marshal(jsonArray)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
+	w.Write(jsonResponse)
+}
+
 func main() {
 	defer db.Close()
 
@@ -660,18 +691,22 @@ func main() {
 	router.GET("/upload/preview/:alias", uploadPreviewHandler)
 
 	router.POST("/save/image", saveImageHandler)
+
 	router.GET("/image/:alias", getImageHandler)
-	router.POST("/images", getUserImagesHandler)
 	router.POST("/image/replace", replaceStageImageHandler)
+	router.POST("/images", getUserImagesHandler)
 
 	router.POST("/random/stages", randomStageHandler)
 	router.POST("/random/image", randomImageHandler)
 	router.GET("/random/image/:alias", getRandomImageHandler)
+
 	router.GET("/config/:id", getConfigHandler)
 	router.POST("/config", postConfigHandler)
 	router.POST("/config/save", saveConfigHandler)
 	router.GET("/configs/list", getConfigListHandler)
+
 	router.GET("/test/image/:alias", testImageHandler)
+	router.POST("/test/settings/submit", testSettingSubmitHandler)
 
 	n := negroni.New(
 		negroni.NewRecovery(),

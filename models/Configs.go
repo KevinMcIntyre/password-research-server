@@ -8,7 +8,8 @@ import (
 )
 
 type Config struct {
-	ConfigId             int                                     `json:"configId"`
+	SubjectID            int                                     `json:"subjectId"`
+	ConfigID             int                                     `json:"configId"`
 	Name                 string                                  `json:"name"`
 	Stages               int                                     `json:"stages"`
 	Rows                 int                                     `json:"rows"`
@@ -96,7 +97,7 @@ func (request Config) Save(db *sql.DB) error {
         stage_count = $4,
         image_may_not_be_present = $5
     WHERE id = $6
-  `, request.Name, request.Rows, request.Columns, request.Stages, request.ImageMaybeNotPresent, request.ConfigId)
+  `, request.Name, request.Rows, request.Columns, request.Stages, request.ImageMaybeNotPresent, request.ConfigID)
 	if err != nil {
 		return err
 	}
@@ -109,7 +110,7 @@ func (request Config) Save(db *sql.DB) error {
     INSERT INTO test_config_stages (test_config_id, stage_number, creation_date)
     VALUES ($1, $2, $3)
     RETURNING id;
-  `, request.ConfigId, stageInt, time.Now()).Scan(&stageId)
+  `, request.ConfigID, stageInt, time.Now()).Scan(&stageId)
 		stageIdMap[stage] = stageId
 	}
 
@@ -136,7 +137,7 @@ func (request Config) Save(db *sql.DB) error {
           $2
         FROM random_stage_images
         WHERE test_config_id = $3 AND alias = $4 LIMIT 1
-      `, stageIdMap[stage], time.Now(), request.ConfigId, request.Matrix[stage][row][col], row, col)
+      `, stageIdMap[stage], time.Now(), request.ConfigID, request.Matrix[stage][row][col], row, col)
 				if err != nil {
 					return err
 				}
@@ -178,7 +179,7 @@ func GetConfigList(db *sql.DB) []ConfigLabelAndId {
 func GetConfigById(db *sql.DB, configId int) *Config {
 	config := new(Config)
 
-	config.ConfigId = configId
+	config.ConfigID = configId
 
 	db.QueryRow(`SELECT name, stage_count, rows_in_matrix, cols_in_matrix, image_may_not_be_present
               FROM test_configs
