@@ -94,15 +94,6 @@ CREATE TABLE uploaded_images (
     CONSTRAINT pk_uploaded_images PRIMARY KEY (id)
 );
 
-CREATE TABLE trial_images (
-    id BIGSERIAL NOT NULL,
-    image BYTEA NOT NULL,
-    image_type VARCHAR(20) NOT NULL,
-    trial_id INTEGER,
-    alias VARCHAR(40)
-    CONSTRAINT pk_uploaded_images PRIMARY KEY (id)
-);
-
 CREATE TABLE image_trial_stage_results (
     id BIGSERIAL NOT NULL,
     trial_id INTEGER NOT NULL,
@@ -121,8 +112,7 @@ CREATE TABLE image_trials (
     passed_auth boolean,
     start_time TIMESTAMP,
     end_time TIMESTAMP,
-    notes TEXT,
-    creation_date TIMESTAMP
+    notes TEXT
     CONSTRAINT pk_image_trials PRIMARY KEY (id)
 );
 
@@ -196,9 +186,3 @@ VALUES
 INSERT INTO collections (id, label)
 VALUES
   (0, 'NULL');
-
-INSERT INTO image_trials (
-    subject_id,
-    test_config_id,
-    s
-);

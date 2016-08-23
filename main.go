@@ -511,7 +511,7 @@ func saveConfigHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	err = configSaveRequest.Save(db)
+	err = configSaveRequest.SaveAsConfig(db)
 	var jsonArray []string
 
 	if err != nil {
@@ -642,14 +642,15 @@ func getSubjectPassImages(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 func testSettingSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	decoder := json.NewDecoder(r.Body)
-	var configSaveRequest models.Config
-	err := decoder.Decode(&configSaveRequest)
+	var testParameters models.Config
+	err := decoder.Decode(&testParameters)
 	if err != nil {
 		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	fmt.Println(configSaveRequest)
+
+	fmt.Println(testParameters)
 	// err = configSaveRequest.Save(db)
 	var jsonArray []string
 
