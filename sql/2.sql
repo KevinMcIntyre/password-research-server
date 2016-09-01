@@ -56,7 +56,7 @@ CREATE TABLE test_config_stage_images (
     id BIGSERIAL NOT NULL,
     image BYTEA,
     image_type VARCHAR(20) NOT NULL,
-    stage_id INTEGER NOT NULL,
+    stage_number INTEGER NOT NULL,
     alias VARCHAR(40),
     row_number INTEGER NOT NULL,
     column_number INTEGER NOT NULL,
@@ -94,14 +94,24 @@ CREATE TABLE uploaded_images (
     CONSTRAINT pk_uploaded_images PRIMARY KEY (id)
 );
 
---!  !--
+CREATE TABLE image_trial_images (
+    id BIGSERIAL NOT NULL,
+    image BYTEA,
+    image_type VARCHAR(20) NOT NULL,
+    stage_number INTEGER NOT NULL,
+    alias VARCHAR(40),
+    row_number INTEGER NOT NULL,
+    column_number INTEGER NOT NULL,
+    is_user_image BOOLEAN,
+    CONSTRAINT pk_test_config_stage_images PRIMARY KEY (id)
+);
+
 CREATE TABLE image_trial_stage_results (
     id BIGSERIAL NOT NULL,
     trial_id INTEGER NOT NULL,
-    config_stage_id INTEGER NOT NULL,
-    passed_auth boolean,
-    selected_test_image_id INTEGER,
-    correct_saved_image_id INTEGER,
+    stage_number INTEGER NOT NULL,
+    passed_auth BOOLEAN,
+    selected_trial_image_id INTEGER,
     start_time TIMESTAMP,
     end_time TIMESTAMP
     CONSTRAINT pk_image_trial_stage_results PRIMARY KEY (id)
@@ -111,9 +121,6 @@ CREATE TABLE image_trials (
     id BIGSERIAL NOT NULL,
     subject_id INTEGER NOT NULL,
     test_config_id INTEGER NOT NULL,
-    start_time TIMESTAMP,
-    end_time TIMESTAMP,
-    image_matrix JSONB,
     notes TEXT,
     creation_date TIMESTAMP
     CONSTRAINT pk_image_trials PRIMARY KEY (id)
@@ -190,16 +197,64 @@ INSERT INTO collections (id, label)
 VALUES
   (0, 'NULL');
 
+CREATE FUNCTION duplicate_config_images(trial_id int, test_config_id int) RETURNS INTEGER AS $$
+BEGIN
+    INSERT INTO image_trial_images (image, image_type, stage_number, alias, row_number, column_number)
+    SELECT
+    image,
+    image_type,
+    stage_number,
+    CASE WHEN alias = 'user-img'
+        THEN 'user-img'
+        ELSE replace(md5(random() :: TEXT || clock_timestamp() :: TEXT), '-' :: TEXT, '' :: TEXT) :: VARCHAR(60)
+    END AS alias,
+    row_number,
+    column_number
+    FROM test_config_stage_images
+    WHERE stage_id IN (
+        SELECT id
+        FROM test_config_stages
+        WHERE test_config_id = $2
+    );
+END;
+$$  LANGUAGE plpgsql
+
+CREATE FUNCTION create_image_trial(subject_id int, test_config_id int, number_of_stages int) RETURNS INTEGER AS $$
+DECLARE
+    trial_id int;
+    current_stage_number int := 1;
+BEGIN
+	INSERT INTO image_trials (subject_id, test_config_id, creation_date)
+	VALUES ($1, $2, now())
+	RETURNING id INTO trial_id;
+
+    LOOP
+        EXIT WHEN current_stage_number > $3;
+        INSERT INTO image_trial_stage_results (trial_id, stage_number)
+        VALUES (trial_id, current_stage_number);
+        current_stage_number := current_stage_number + 1;
+    END LOOP;
+
+    PERFORM duplicate_config_images(trial_id, $2);
+END;
+$$  LANGUAGE plpgsql
+
 CREATE FUNCTION submit_image_selection(trial_id int, stage_number int, selected_alias VARCHAR(255), subject_id int) RETURNS void AS $$
+DECLARE
+    test_config_stage_id int := (SELECT id FROM test_config_stages WHERE stage_number = $2);
 BEGIN
   IF EXISTS (SELECT id FROM saved_images WHERE alias = $3 AND subject_id = $4) THEN
     UPDATE image_trial_stage_results
     SET passed_auth = true,
         correct_saved_image_id = (SELECT id FROM saved_images WHERE alias = $3 AND subject_id = $4),
         end_time = now()
-    WHERE trial_id = $1 AND st;
+    WHERE trial_id = $1 AND config_stage_id = test_config_stage_id;
   ELSE
-    INSERT INTO orders VALUES (1,2,3);
+    UPDATE image_trial_stage_results
+    SET passed_auth = false,
+        selected_test_image_id = (SELECT id FROM test_config_stage_images WHERE alias = $3 AND stage_id = test_config_stage_id),
+        end_time = now()
+    WHERE trial_id = $1 AND config_stage_id = test_config_stage_id;
   END IF;
 END;
 $$  LANGUAGE plpgsql

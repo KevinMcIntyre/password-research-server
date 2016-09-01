@@ -511,7 +511,7 @@ func saveConfigHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	err = configSaveRequest.SaveAsConfig(db)
+	err = configSaveRequest.Save(db)
 	var jsonArray []string
 
 	if err != nil {

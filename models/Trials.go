@@ -1,23 +1,31 @@
 package models
 
-import "time"
+import "database/sql"
 
-type ImageTrial struct {
-	SubjectID    int
-	ConfigID     int
-	StartTime    time.Time
-	EndTime      time.Time
-	ImageMatrix  map[string]interface{}
-	Notes        string
-	CreationDate time.Time
-	Stages       []ImageTrialStage
+type Trial struct {
+	SubjectID            int                                     `json:"subjectId"`
+	ConfigID             int                                     `json:"configId"`
+	Stages               int                                     `json:"stages"`
+	Rows                 int                                     `json:"rows"`
+	Columns              int                                     `json:"columns"`
+	ImageMaybeNotPresent bool                                    `json:"imageMaybeNotPresent"`
+	Matrix               map[string]map[string]map[string]string `json:"matrix"`
+	UserPassImages       []UserPassImage                         `json:"passImages"`
 }
 
-type ImageTrialStage struct {
-	SuccessfulAuthentication bool
-	ConfigStageID            int
-	SelectedTestImageID      int
-	CorrectSavedImageID      int
-	StartTime                time.Time
-	EndTime                  time.Time
+type UserPassImage struct {
+	StageNumber  int    `json:"stage"`
+	RowNumber    int    `json:"row"`
+	ColumnNumber int    `json:"column"`
+	ImageAlias   string `json:"image"`
+}
+
+func (request Trial) Save(db *sql.DB) int {
+	var trialID int
+	db.QueryRow(`SELECT create_image_trial($1, $2, $3);`,
+		request.SubjectID,
+		request.ConfigID,
+		request.Stages).Scan(&trialID)
+
+	return trialID
 }
