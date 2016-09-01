@@ -94,21 +94,14 @@ CREATE TABLE uploaded_images (
     CONSTRAINT pk_uploaded_images PRIMARY KEY (id)
 );
 
-CREATE TABLE trial_images (
-    id BIGSERIAL NOT NULL,
-    image BYTEA NOT NULL,
-    image_type VARCHAR(20) NOT NULL,
-    trial_id INTEGER,
-    alias VARCHAR(40)
-    CONSTRAINT pk_uploaded_images PRIMARY KEY (id)
-);
-
+--!  !--
 CREATE TABLE image_trial_stage_results (
     id BIGSERIAL NOT NULL,
     trial_id INTEGER NOT NULL,
-    stage_id INTEGER NOT NULL,
-    selected_image_id INTEGER NOT NULL,
-    correct_image_id INTEGER,
+    config_stage_id INTEGER NOT NULL,
+    passed_auth boolean,
+    selected_test_image_id INTEGER,
+    correct_saved_image_id INTEGER,
     start_time TIMESTAMP,
     end_time TIMESTAMP
     CONSTRAINT pk_image_trial_stage_results PRIMARY KEY (id)
@@ -118,9 +111,9 @@ CREATE TABLE image_trials (
     id BIGSERIAL NOT NULL,
     subject_id INTEGER NOT NULL,
     test_config_id INTEGER NOT NULL,
-    passed_auth boolean,
     start_time TIMESTAMP,
     end_time TIMESTAMP,
+    image_matrix JSONB,
     notes TEXT,
     creation_date TIMESTAMP
     CONSTRAINT pk_image_trials PRIMARY KEY (id)
@@ -197,8 +190,16 @@ INSERT INTO collections (id, label)
 VALUES
   (0, 'NULL');
 
-INSERT INTO image_trials (
-    subject_id,
-    test_config_id,
-    s
-);
+CREATE FUNCTION submit_image_selection(trial_id int, stage_number int, selected_alias VARCHAR(255), subject_id int) RETURNS void AS $$
+BEGIN
+  IF EXISTS (SELECT id FROM saved_images WHERE alias = $3 AND subject_id = $4) THEN
+    UPDATE image_trial_stage_results
+    SET passed_auth = true,
+        correct_saved_image_id = (SELECT id FROM saved_images WHERE alias = $3 AND subject_id = $4),
+        end_time = now()
+    WHERE trial_id = $1 AND st;
+  ELSE
+    INSERT INTO orders VALUES (1,2,3);
+  END IF;
+END;
+$$  LANGUAGE plpgsql
