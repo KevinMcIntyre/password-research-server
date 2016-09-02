@@ -20,12 +20,36 @@ type UserPassImage struct {
 	ImageAlias   string `json:"image"`
 }
 
-func (request Trial) Save(db *sql.DB) int {
+func (request Trial) Save(db *sql.DB) (int, error) {
 	var trialID int
+
 	db.QueryRow(`SELECT create_image_trial($1, $2, $3);`,
 		request.SubjectID,
 		request.ConfigID,
 		request.Stages).Scan(&trialID)
 
-	return trialID
+	transaction, err := db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	for _, userPassImage := range request.UserPassImages {
+		_, err = transaction.Exec(`
+			UPDATE image_trial_images
+			SET alias = $1, is_user_image = true
+			WHERE stage_number = $2, row_number = $3, column_number = $4;
+		`, userPassImage.ImageAlias,
+			userPassImage.StageNumber,
+			userPassImage.RowNumber,
+			userPassImage.ColumnNumber)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	err = transaction.Commit()
+
+	if err != nil {
+		return 0, err
+	}
+	return trialID, nil
 }
