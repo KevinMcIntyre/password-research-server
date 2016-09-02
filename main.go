@@ -642,22 +642,22 @@ func getSubjectPassImages(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 func testSettingSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	decoder := json.NewDecoder(r.Body)
-	var testParameters models.Config
-	err := decoder.Decode(&testParameters)
+	var trialParams models.TrialRequest
+	err := decoder.Decode(&trialParams)
 	if err != nil {
 		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Println(testParameters)
-	// err = configSaveRequest.Save(db)
+	trialID, err := trialParams.Save(db)
+
 	var jsonArray []string
 
 	if err != nil {
 		jsonArray = append(jsonArray, err.Error())
 	} else {
-		jsonArray = append(jsonArray, "swag")
+		jsonArray = append(jsonArray, strconv.Itoa(trialID))
 	}
 
 	jsonResponse, err := json.Marshal(jsonArray)

@@ -122,21 +122,22 @@ func (request Config) Save(db *sql.DB) error {
 		for row, _ := range request.Matrix[stage] {
 			for col, _ := range request.Matrix[stage][row] {
 				_, err = transaction.Exec(`
-        INSERT INTO test_config_stage_images (image, image_type, stage_id, alias, row_number, column_number, creation_date)
+        INSERT INTO test_config_stage_images (image, image_type, stage_id, stage_number, alias, row_number, column_number, creation_date)
         SELECT
           image,
           image_type,
           $1,
+		  $2,
           CASE WHEN alias = 'user-img'
             THEN 'user-img'
             ELSE replace(md5(random() :: TEXT || clock_timestamp() :: TEXT), '-' :: TEXT, '' :: TEXT) :: VARCHAR(60)
           END AS alias,
-          $5,
           $6,
-          $2
+          $7,
+          $3
         FROM random_stage_images
-        WHERE test_config_id = $3 AND alias = $4 LIMIT 1
-      `, stageIdMap[stage], time.Now(), request.ConfigID, request.Matrix[stage][row][col], row, col)
+        WHERE test_config_id = $4 AND alias = $5 LIMIT 1
+      `, stageIdMap[stage], stage, time.Now(), request.ConfigID, request.Matrix[stage][row][col], row, col)
 				if err != nil {
 					return err
 				}
