@@ -533,8 +533,12 @@ func saveConfigHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 }
 
 func getConfigListHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	configList := models.GetConfigList(db)
-
+	configList, err := models.GetConfigList(db)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	jsonResponse, err := json.Marshal(configList)
 	if err != nil {
 		fmt.Println(err)
@@ -651,18 +655,36 @@ func testSettingSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprou
 	}
 
 	trialID, err := trialParams.Save(db)
-
-	var jsonArray []string
-
 	if err != nil {
-		jsonArray = append(jsonArray, err.Error())
-	} else {
-		jsonArray = append(jsonArray, strconv.Itoa(trialID))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	jsonResponse, err := json.Marshal(jsonArray)
+	trialInfo := models.GetTrialInfoById(db, trialID)
+
+	jsonResponse, err := json.Marshal(trialInfo)
 
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
+	w.Write(jsonResponse)
+}
+
+func trialListHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	trialList, err := models.GetTrialList(db)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse, err := json.Marshal(trialList)
+	if err != nil {
+		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -708,6 +730,7 @@ func main() {
 
 	router.GET("/test/image/:alias", testImageHandler)
 	router.POST("/test/settings/submit", testSettingSubmitHandler)
+	router.GET("/trial/list", trialListHandler)
 
 	n := negroni.New(
 		negroni.NewRecovery(),

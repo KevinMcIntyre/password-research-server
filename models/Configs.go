@@ -2,7 +2,6 @@ package models
 
 import (
 	"database/sql"
-	"fmt"
 	"strconv"
 	"time"
 )
@@ -154,11 +153,10 @@ func (request Config) Save(db *sql.DB) error {
 	return nil
 }
 
-func GetConfigList(db *sql.DB) []ConfigLabelAndId {
+func GetConfigList(db *sql.DB) ([]ConfigLabelAndId, error) {
 	rows, err := db.Query("SELECT id, name FROM test_configs WHERE id != 0 AND name IS NOT NULL ORDER BY UPPER(name) ASC")
 	if err != nil {
-		fmt.Println(err)
-		// handle error
+		return nil, err
 	}
 
 	var configList []ConfigLabelAndId
@@ -166,14 +164,12 @@ func GetConfigList(db *sql.DB) []ConfigLabelAndId {
 	for rows.Next() {
 		configLabelAndId := new(ConfigLabelAndId)
 		if err := rows.Scan(&configLabelAndId.Id, &configLabelAndId.Label); err != nil {
-			fmt.Println(err)
-			fmt.Println(err)
-			// handle error
+			return nil, err
 		}
 		configList = append(configList, *configLabelAndId)
 	}
 
-	return configList
+	return configList, nil
 }
 
 func GetConfigById(db *sql.DB, configId int) *Config {

@@ -1,6 +1,17 @@
 package models
 
-import "database/sql"
+import (
+	"database/sql"
+	"time"
+)
+
+type TrialInfo struct {
+	ID           int       `json:"id"`
+	SubjectName  string    `json:"subjectName"`
+	TrialType    string    `json:"trialType"`
+	ConfigName   string    `json:"configName"`
+	CreationDate time.Time `json:"creationDate"`
+}
 
 type TrialRequest struct {
 	SubjectID      int             `json:"subjectId"`
@@ -60,4 +71,65 @@ func (request TrialRequest) Save(db *sql.DB) (int, error) {
 		return 0, err
 	}
 	return trialID, nil
+}
+
+func GetTrialList(db *sql.DB) ([]TrialInfo, error) {
+	rows, err := db.Query(`
+		SELECT 
+		it.id,
+		s.first_name || ' ' || s.last_name AS subject_name,
+		'Pass-Image' as trial_type,
+		tc.name as config_name,
+		it.creation_date
+		FROM image_trials it
+		JOIN subjects s ON s.id = it.subject_id 
+		JOIN test_configs tc ON tc.id = it.test_config_id
+		WHERE it.id NOT IN (
+			SELECT DISTINCT trial_id
+			FROM image_trial_stage_results
+			WHERE start_time IS NOT NULL
+		)
+		ORDER BY it.creation_date ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	var trials []TrialInfo
+	defer rows.Close()
+	for rows.Next() {
+		trialInfo := new(TrialInfo)
+		if err := rows.Scan(&trialInfo.ID,
+			&trialInfo.SubjectName,
+			&trialInfo.TrialType,
+			&trialInfo.ConfigName,
+			&trialInfo.CreationDate); err != nil {
+			return nil, err
+		}
+		trials = append(trials, *trialInfo)
+	}
+
+	return trials, nil
+}
+
+func GetTrialInfoById(db *sql.DB, trialID int) TrialInfo {
+	trialInfo := new(TrialInfo)
+	db.QueryRow(`
+		SELECT 
+		it.id,
+		s.first_name || ' ' || s.last_name AS subject_name,
+		'Pass-Image' as trial_type,
+		tc.name as config_name,
+		it.creation_date
+		FROM image_trials it
+		JOIN subjects s ON s.id = it.subject_id 
+		JOIN test_configs tc ON tc.id = it.test_config_id
+		WHERE it.id = $1
+	`, trialID).Scan(&trialInfo.ID,
+		&trialInfo.SubjectName,
+		&trialInfo.TrialType,
+		&trialInfo.ConfigName,
+		&trialInfo.CreationDate)
+
+	return *trialInfo
 }

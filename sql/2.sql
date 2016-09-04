@@ -197,7 +197,7 @@ INSERT INTO collections (id, label)
 VALUES
   (0, 'NULL');
 
-CREATE FUNCTION duplicate_config_images(trial_id int, test_config_id int) RETURNS INTEGER AS $$
+CREATE FUNCTION duplicate_config_images(trial_id int, config_id int) RETURNS VOID AS $$
 BEGIN
     INSERT INTO image_trial_images (image, image_type, stage_number, alias, row_number, column_number)
     SELECT
@@ -220,7 +220,7 @@ END;
 $$
 LANGUAGE plpgsql;
 
-CREATE FUNCTION create_image_trial(subject_id int, test_config_id int, number_of_stages int) RETURNS INTEGER AS $$
+CREATE FUNCTION create_image_trial(subject_id int, config_id int, number_of_stages int) RETURNS INTEGER AS $$
 DECLARE
     trial_id int;
     current_stage_number int := 1;
@@ -237,6 +237,7 @@ BEGIN
     END LOOP;
 
     PERFORM duplicate_config_images(trial_id, $2);
+    RETURN trial_id;
 END;
 $$
 LANGUAGE plpgsql;
