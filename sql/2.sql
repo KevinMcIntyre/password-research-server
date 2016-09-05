@@ -99,6 +99,7 @@ CREATE TABLE image_trial_images (
     id BIGSERIAL NOT NULL,
     image BYTEA,
     image_type VARCHAR(20) NOT NULL,
+    trial_id INTEGER NOT NULL,
     stage_number INTEGER NOT NULL,
     alias VARCHAR(40),
     row_number INTEGER NOT NULL,
@@ -160,6 +161,7 @@ CREATE SEQUENCE image_trials_seq;
 -- CREATE SEQUENCE string_trials_seq;
 
 --! FOREIGN KEY REFERENCES !--
+ ALTER TABLE image_trial_images ADD CONSTRAINT fk_image_trial_images_trial_id_01 FOREIGN KEY (trial_id) REFERENCES image_trials(id);
  ALTER TABLE image_trial_stage_results ADD CONSTRAINT fk_image_trial_stage_results_selected_image_id_01 FOREIGN KEY (selected_trial_image_id) REFERENCES image_trial_images(id);
  ALTER TABLE image_trial_stage_results ADD CONSTRAINT fk_image_trial_stage_results_trial_id_01 FOREIGN KEY (trial_id) REFERENCES image_trials(id);
  ALTER TABLE image_trials ADD CONSTRAINT fk_image_trials_config_id_01 FOREIGN KEY (test_config_id) REFERENCES test_configs(id);
@@ -199,13 +201,14 @@ VALUES
 
 CREATE FUNCTION duplicate_config_images(trial_id int, config_id int) RETURNS VOID AS $$
 BEGIN
-    INSERT INTO image_trial_images (image, image_type, stage_number, alias, row_number, column_number)
+    EXECUTE 'INSERT INTO image_trial_images (image, image_type, trial_id, stage_number, alias, row_number, column_number)
     SELECT
     image,
     image_type,
+    $1,
     stage_number,
-    CASE WHEN alias = 'user-img'
-        THEN 'user-img'
+    CASE WHEN alias = ''user-img''
+        THEN ''user-img''
         ELSE replace(md5(random() :: TEXT || clock_timestamp() :: TEXT), '-' :: TEXT, '' :: TEXT) :: VARCHAR(60)
     END AS alias,
     row_number,
@@ -215,7 +218,8 @@ BEGIN
         SELECT id
         FROM test_config_stages
         WHERE test_config_id = $2
-    );
+    );'
+    USING trial_id, config_id;
 END;
 $$
 LANGUAGE plpgsql;

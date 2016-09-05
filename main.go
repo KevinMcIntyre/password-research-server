@@ -445,7 +445,7 @@ func randomStageHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		log.Println("Error committing db transaction", err)
 	}
 
-	matrixMap := models.GetMatrixMap(db, configId, true)
+	matrixMap := models.GetMatrixMap(db, models.GetRandomImagesByConfigId(db, configId))
 
 	matrixResponse := new(models.ImageMatrixResponse)
 	matrixResponse.Id = configId
@@ -694,6 +694,34 @@ func trialListHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	w.Write(jsonResponse)
 }
 
+func trialStartHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	decoder := json.NewDecoder(r.Body)
+	trialStartRequest := struct {
+		TrialID int `json:"trialId"`
+	}{}
+	err := decoder.Decode(&trialStartRequest)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	trialData, err := models.GetImageTrial(db, trialStartRequest.TrialID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse, err := json.Marshal(*trialData)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
+	w.Write(jsonResponse)
+}
+
 func main() {
 	defer db.Close()
 
@@ -731,6 +759,7 @@ func main() {
 	router.GET("/test/image/:alias", testImageHandler)
 	router.POST("/test/settings/submit", testSettingSubmitHandler)
 	router.GET("/trial/list", trialListHandler)
+	router.POST("/trial/start", trialStartHandler)
 
 	n := negroni.New(
 		negroni.NewRecovery(),

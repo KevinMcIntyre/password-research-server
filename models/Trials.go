@@ -5,6 +5,16 @@ import (
 	"time"
 )
 
+type ImageTrial struct {
+	ID                   int                                     `json:"id"`
+	SubjectName          string                                  `json:"subjectName"`
+	Stages               int                                     `json:"stages"`
+	Rows                 int                                     `json:"rows"`
+	Columns              int                                     `json:"columns"`
+	ImageMaybeNotPresent bool                                    `json:"imageMaybeNotPresent"`
+	Matrix               map[string]map[string]map[string]string `json:"matrix"`
+}
+
 type TrialInfo struct {
 	ID           int       `json:"id"`
 	SubjectName  string    `json:"subjectName"`
@@ -132,4 +142,57 @@ func GetTrialInfoById(db *sql.DB, trialID int) TrialInfo {
 		&trialInfo.CreationDate)
 
 	return *trialInfo
+}
+
+func GetImageTrial(db *sql.DB, trialId int) (*ImageTrial, error) {
+	var imageTrial ImageTrial
+	db.QueryRow(`
+		SELECT
+		it.id,
+		s.first_name || ' ' || s.last_name AS subject_name,
+		tc.stage_count,
+		tc.rows_in_matrix,
+		tc.cols_in_matrix,
+		tc.image_may_not_be_present
+		FROM image_trials it
+		JOIN subjects s ON s.id = it.subject_id
+		JOIN test_configs tc ON tc.id = it.test_config_id
+		WHERE it.id = $1
+	`, trialId).Scan(&imageTrial.ID,
+		&imageTrial.SubjectName,
+		&imageTrial.Stages,
+		&imageTrial.Rows,
+		&imageTrial.Columns,
+		&imageTrial.ImageMaybeNotPresent)
+	trialImages, err := getTrialImages(db, trialId)
+	if err != nil {
+		return nil, err
+	}
+
+	imageMatrix := GetMatrixMap(db, trialImages)
+	imageTrial.Matrix = *imageMatrix
+
+	return &imageTrial, nil
+}
+
+func getTrialImages(db *sql.DB, trialID int) (*[]*MatrixImage, error) {
+	var images []*MatrixImage
+	rows, err := db.Query(`
+		SELECT image.alias, image.stage_number, image.row_number, image.column_number
+		FROM image_trial_images image
+		WHERE image.trial_id = $1
+		ORDER BY image.stage_number ASC, image.row_number, image.column_number ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		image := new(MatrixImage)
+		if err := rows.Scan(&image.Alias, &image.Stage, &image.Row, &image.Column); err != nil {
+			return nil, err
+		}
+		images = append(images, image)
+	}
+	return &images, nil
 }

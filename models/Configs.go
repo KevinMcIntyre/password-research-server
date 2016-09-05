@@ -181,7 +181,7 @@ func GetConfigById(db *sql.DB, configId int) *Config {
               FROM test_configs
               WHERE id = $1`, configId).Scan(&config.Name, &config.Stages, &config.Rows, &config.Columns, &config.ImageMaybeNotPresent)
 
-	config.Matrix = *GetMatrixMap(db, configId, false)
+	config.Matrix = *GetMatrixMap(db, getStageImagesByConfigId(db, configId))
 
 	return config
 }

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type RandomImage struct {
+type MatrixImage struct {
 	Alias  string
 	Stage  int
 	Row    int
@@ -19,8 +19,8 @@ type ImageMatrixResponse struct {
 	Matrix map[string]map[string]map[string]string
 }
 
-func ReplaceRandomImage(db *sql.DB, configId int, collectionId int, selectedAlias string, replacementAlias string, replacementType string) *RandomImage {
-	replacedImage := new(RandomImage)
+func ReplaceRandomImage(db *sql.DB, configId int, collectionId int, selectedAlias string, replacementAlias string, replacementType string) *MatrixImage {
+	replacedImage := new(MatrixImage)
 
 	if replacementType == "random-img" {
 		db.QueryRow(`UPDATE random_stage_images
@@ -33,14 +33,14 @@ func ReplaceRandomImage(db *sql.DB, configId int, collectionId int, selectedAlia
 			selectedAlias,
 			replacementAlias).Scan(&replacedImage.Stage, &replacedImage.Row, &replacedImage.Column, &replacedImage.Alias)
 	} else if replacementType == "user-img" {
-    db.QueryRow(`
+		db.QueryRow(`
       UPDATE random_stage_images SET alias ='user-img', image = NULL
       WHERE alias = $2 AND test_config_id = $1
       RETURNING stage_number, row_number, column_number, alias;
     `,
-      configId,
-      selectedAlias).Scan(&replacedImage.Stage, &replacedImage.Row, &replacedImage.Column, &replacedImage.Alias)
-  } else {
+			configId,
+			selectedAlias).Scan(&replacedImage.Stage, &replacedImage.Row, &replacedImage.Column, &replacedImage.Alias)
+	} else {
 		db.QueryRow(`WITH replacing AS (
       SELECT 0 as id, test_config_id, stage_number, row_number, column_number
       FROM random_stage_images WHERE alias = $2 AND test_config_id = $1
@@ -74,16 +74,17 @@ func ReplaceRandomImage(db *sql.DB, configId int, collectionId int, selectedAlia
 	return replacedImage
 }
 
-func getRandomImagesByConfigId(db *sql.DB, configId int) *[]*RandomImage {
-	var randomImages []*RandomImage
+func GetRandomImagesByConfigId(db *sql.DB, configId int) *[]*MatrixImage {
+	var randomImages []*MatrixImage
 
 	rows, err := db.Query("SELECT alias, stage_number, row_number, column_number FROM random_stage_images WHERE test_config_id = $1;", configId)
 	if err != nil {
 		fmt.Println(err)
 		// handle error
 	}
+	defer rows.Close()
 	for rows.Next() {
-		randomImage := new(RandomImage)
+		randomImage := new(MatrixImage)
 		if err := rows.Scan(&randomImage.Alias, &randomImage.Stage, &randomImage.Row, &randomImage.Column); err != nil {
 			fmt.Println(err)
 			// handle error
@@ -95,51 +96,44 @@ func getRandomImagesByConfigId(db *sql.DB, configId int) *[]*RandomImage {
 		fmt.Println(err)
 		// handle error
 	}
-	rows.Close()
 
 	return &randomImages
 }
 
-func getStageImagesByConfigId(db *sql.DB, configId int) *[]*RandomImage {
-  var randomImages []*RandomImage
+func getStageImagesByConfigId(db *sql.DB, configId int) *[]*MatrixImage {
+	var randomImages []*MatrixImage
 
-  rows, err := db.Query(`
+	rows, err := db.Query(`
     SELECT image.alias, stage.stage_number, image.row_number, image.column_number
     FROM test_config_stage_images image
     JOIN test_config_stages stage ON image.stage_id = stage.id
     WHERE stage.test_config_id = $1
     ORDER BY stage.stage_number ASC, image.row_number, image.column_number ASC
   `, configId)
-  if err != nil {
-    fmt.Println(err)
-    // handle error
-  }
-  for rows.Next() {
-    randomImage := new(RandomImage)
-    if err := rows.Scan(&randomImage.Alias, &randomImage.Stage, &randomImage.Row, &randomImage.Column); err != nil {
-      fmt.Println(err)
-      // handle error
-    }
-    randomImages = append(randomImages, randomImage)
-  }
+	if err != nil {
+		fmt.Println(err)
+		// handle error
+	}
+	defer rows.Close()
+	for rows.Next() {
+		randomImage := new(MatrixImage)
+		if err := rows.Scan(&randomImage.Alias, &randomImage.Stage, &randomImage.Row, &randomImage.Column); err != nil {
+			fmt.Println(err)
+			// handle error
+		}
+		randomImages = append(randomImages, randomImage)
+	}
 
-  if err := rows.Err(); err != nil {
-    fmt.Println(err)
-    // handle error
-  }
-  rows.Close()
+	if err := rows.Err(); err != nil {
+		fmt.Println(err)
+		// handle error
+	}
 
-  return &randomImages
+	return &randomImages
 }
 
-func GetMatrixMap(db *sql.DB, configId int, randomImages bool) *map[string]map[string]map[string]string {
+func GetMatrixMap(db *sql.DB, imagePointers *[]*MatrixImage) *map[string]map[string]map[string]string {
 	var matrixMap = make(map[string]map[string]map[string]string)
-  var imagePointers *[]*RandomImage
-  if (randomImages) {
-    imagePointers = getRandomImagesByConfigId(db, configId)
-  } else {
-    imagePointers = getStageImagesByConfigId(db, configId)
-  }
 	for _, imagePointer := range *imagePointers {
 		image := *imagePointer
 		addToMatrixMap(matrixMap, strconv.Itoa(image.Stage), strconv.Itoa(image.Row), strconv.Itoa(image.Column), image.Alias)
