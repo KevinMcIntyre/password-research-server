@@ -209,7 +209,7 @@ BEGIN
     stage_number,
     CASE WHEN alias = ''user-img''
         THEN ''user-img''
-        ELSE replace(md5(random() :: TEXT || clock_timestamp() :: TEXT), '-' :: TEXT, '' :: TEXT) :: VARCHAR(60)
+        ELSE regexp_replace(md5(random() :: TEXT || clock_timestamp() :: TEXT) :: VARCHAR(60), ''[^a-zA-Z0-9]+$|-'', '''', ''g'')
     END AS alias,
     row_number,
     column_number

@@ -40,10 +40,21 @@ type UserPassImage struct {
 func (request TrialRequest) Save(db *sql.DB) (int, error) {
 	var trialID int
 
-	db.QueryRow(`SELECT create_image_trial($1, $2, $3);`,
+	rows, err := db.Query(`SELECT create_image_trial($1, $2, $3);`,
 		request.SubjectID,
 		request.ConfigID,
-		request.Stages).Scan(&trialID)
+		request.Stages)
+	if err != nil {
+		return 0, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		if err := rows.Scan(&trialID); err != nil {
+			return 0, err
+		}
+	}
 
 	transaction, err := db.Begin()
 	if err != nil {
@@ -182,7 +193,7 @@ func getTrialImages(db *sql.DB, trialID int) (*[]*MatrixImage, error) {
 		FROM image_trial_images image
 		WHERE image.trial_id = $1
 		ORDER BY image.stage_number ASC, image.row_number, image.column_number ASC
-	`)
+	`, trialID)
 	if err != nil {
 		return nil, err
 	}
