@@ -11,7 +11,7 @@ type ImageTrial struct {
 	Stages               int                                     `json:"stages"`
 	Rows                 int                                     `json:"rows"`
 	Columns              int                                     `json:"columns"`
-	ImageMaybeNotPresent bool                                    `json:"imageMaybeNotPresent"`
+	ImageMayNotBePresent bool                                    `json:"imageMayNotBePresent"`
 	Matrix               map[string]map[string]map[string]string `json:"matrix"`
 }
 
@@ -160,7 +160,7 @@ func GetImageTrial(db *sql.DB, trialId int) (*ImageTrial, error) {
 	db.QueryRow(`
 		SELECT
 		it.id,
-		s.first_name || ' ' || s.last_name AS subject_name,
+		s.first_name AS subject_name,
 		tc.stage_count,
 		tc.rows_in_matrix,
 		tc.cols_in_matrix,
@@ -174,7 +174,7 @@ func GetImageTrial(db *sql.DB, trialId int) (*ImageTrial, error) {
 		&imageTrial.Stages,
 		&imageTrial.Rows,
 		&imageTrial.Columns,
-		&imageTrial.ImageMaybeNotPresent)
+		&imageTrial.ImageMayNotBePresent)
 	trialImages, err := getTrialImages(db, trialId)
 	if err != nil {
 		return nil, err
