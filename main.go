@@ -596,7 +596,7 @@ func getConfigHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	w.Write(jsonResponse)
 }
 
-func testImageHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func configImageHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var imageBytes string
 	var imageType string
 	err := db.QueryRow("SELECT image, image_type FROM test_config_stage_images WHERE alias=$1", ps.ByName("alias")).Scan(&imageBytes, &imageType)
@@ -607,6 +607,22 @@ func testImageHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+	}
+	buffer := bytes.NewBufferString(imageBytes)
+	w.Header().Set("Content-Type", imageType)
+	w.Header().Set("Content-Length", strconv.Itoa(len(buffer.Bytes())))
+	if _, err := w.Write(buffer.Bytes()); err != nil {
+		fmt.Println("unable to write image.")
+	}
+}
+
+func testImageHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var imageBytes string
+	var imageType string
+	err := db.QueryRow("SELECT image, image_type FROM image_trial_images WHERE alias=$1", ps.ByName("alias")).Scan(&imageBytes, &imageType)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	buffer := bytes.NewBufferString(imageBytes)
 	w.Header().Set("Content-Type", imageType)
@@ -753,6 +769,7 @@ func main() {
 
 	router.GET("/config/:id", getConfigHandler)
 	router.POST("/config", postConfigHandler)
+	router.GET("/configs/image/:alias", configImageHandler)
 	router.POST("/config/save", saveConfigHandler)
 	router.GET("/configs/list", getConfigListHandler)
 
