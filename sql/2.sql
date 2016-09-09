@@ -246,23 +246,50 @@ END;
 $$
 LANGUAGE plpgsql;
 
--- CREATE FUNCTION submit_image_selection(trial_id int, stage_number int, selected_alias VARCHAR(255), subject_id int) RETURNS void AS $$
--- DECLARE
---     test_config_stage_id int := (SELECT id FROM test_config_stages WHERE stage_number = $2);
--- BEGIN
---   IF EXISTS (SELECT id FROM saved_images WHERE alias = $3 AND subject_id = $4) THEN
---     UPDATE image_trial_stage_results
---     SET passed_auth = true,
---         correct_saved_image_id = (SELECT id FROM saved_images WHERE alias = $3 AND subject_id = $4),
---         end_time = now()
---     WHERE trial_id = $1 AND config_stage_id = test_config_stage_id;
---   ELSE
---     UPDATE image_trial_stage_results
---     SET passed_auth = false,
---         selected_trial_image_id = (SELECT id FROM test_config_stage_images WHERE alias = $3 AND stage_id = test_config_stage_id),
---         end_time = now()
---     WHERE trial_id = $1 AND config_stage_id = test_config_stage_id;
---   END IF;
--- END;
--- $$
--- LANGUAGE plpgsql;
+CREATE FUNCTION submit_image_selection(image_trial_id int, stage int, selected_alias VARCHAR(255), submit_time TIMESTAMP) RETURNS RECORD AS $$
+DECLARE
+    result RECORD;
+BEGIN
+    UPDATE image_trial_stage_results
+    SET selected_trial_image_id = subquery.image_id,
+        passed_auth = subquery.passed_auth,
+        end_time = $4
+    FROM (
+        SELECT
+        id AS image_id,
+        CASE WHEN is_user_image IS NULL
+            THEN FALSE
+            ELSE is_user_image
+        END AS passed_auth
+        FROM image_trial_images
+        WHERE trial_id = $1
+        AND stage_number = $2
+        AND alias = $3
+    ) subquery
+    WHERE trial_id = $1 AND stage_number = $2;
+    IF EXISTS (
+        SELECT config.stage_count
+        FROM image_trials trial
+        JOIN test_configs config ON config.id = trial.test_config_id
+        WHERE trial.id = $1 AND config.stage_count > $2
+    ) THEN
+        UPDATE image_trial_stage_results
+        SET start_time = $4
+        WHERE trial_id = $1 AND stage_number = ($2 + 1);
+        SELECT FALSE AS trial_complete, FALSE AS succesful_auth INTO result;
+    ELSE
+        IF EXISTS (
+            SELECT false
+            FROM image_trial_stage_results
+            WHERE trial_id = 1 AND (passed_auth = false OR passed_auth IS NULL)
+            LIMIT 1
+        ) THEN
+            SELECT TRUE AS trial_complete, FALSE AS succesful_auth INTO result;
+        ELSE
+            SELECT TRUE AS trial_complete, TRUE AS succesful_auth INTO result;
+        END IF;
+    END IF;
+    RETURN result;
+END;
+$$
+LANGUAGE plpgsql;

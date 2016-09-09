@@ -738,6 +738,34 @@ func trialStartHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 	w.Write(jsonResponse)
 }
 
+func trialSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	decoder := json.NewDecoder(r.Body)
+	var trialSubmission models.TrialSubmission
+	err := decoder.Decode(&trialSubmission)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	res, err := trialSubmission.Save(db)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse, err := json.Marshal(res)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
+	w.Write(jsonResponse)
+}
+
 func main() {
 	defer db.Close()
 
@@ -777,6 +805,7 @@ func main() {
 	router.POST("/test/settings/submit", testSettingSubmitHandler)
 	router.GET("/trial/list", trialListHandler)
 	router.POST("/trial/start", trialStartHandler)
+	router.POST("/trial/submit", trialSubmitHandler)
 
 	n := negroni.New(
 		negroni.NewRecovery(),

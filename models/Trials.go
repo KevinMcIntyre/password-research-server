@@ -3,6 +3,8 @@ package models
 import (
 	"database/sql"
 	"time"
+
+	"github.com/KevinMcIntyre/password-research-server/utils"
 )
 
 type ImageTrial struct {
@@ -35,6 +37,42 @@ type UserPassImage struct {
 	RowNumber    int    `json:"row"`
 	ColumnNumber int    `json:"column"`
 	ImageAlias   string `json:"alias"`
+}
+
+type TrialSubmission struct {
+	TrialID       int    `json:"trialId"`
+	StageNumber   int    `json:"stage"`
+	ImageAlias    string `json:"imageAlias"`
+	UnixTimestamp string `json:"unixTimestamp"`
+}
+
+type TrialSubmissionResponse struct {
+	TrialComplete            bool `json:"trialComplete"`
+	SuccessfulAuthentication bool `json:"successfulAuth"`
+}
+
+func (submission TrialSubmission) Save(db *sql.DB) (*TrialSubmissionResponse, error) {
+	var response TrialSubmissionResponse
+	timeStamp, err := utils.MsToTime(submission.UnixTimestamp)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.Query(`
+	select *
+	`, submission.TrialID, submission.StageNumber, submission.ImageAlias, timeStamp)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		if err := rows.Scan(&response.TrialComplete, &response.TrialComplete); err != nil {
+			return nil, err
+		}
+	}
+
+	return &response, nil
 }
 
 func (request TrialRequest) Save(db *sql.DB) (int, error) {
