@@ -733,6 +733,12 @@ func trialStartHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
+	go db.Query(`
+		UPDATE image_trial_stage_results
+		SET start_time = $2
+		WHERE trial_id = $1 AND stage_number = 1;
+	`, trialStartRequest.TrialID, time.Now())
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
 	w.Write(jsonResponse)
@@ -748,13 +754,13 @@ func trialSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		return
 	}
 
-	res, err := trialSubmission.Save(db)
+	response, err := trialSubmission.Save(db)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	jsonResponse, err := json.Marshal(res)
+	jsonResponse, err := json.Marshal(response)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

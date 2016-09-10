@@ -58,7 +58,9 @@ func (submission TrialSubmission) Save(db *sql.DB) (*TrialSubmissionResponse, er
 		return nil, err
 	}
 	rows, err := db.Query(`
-	select *
+	SELECT *
+	FROM submit_image_selection($1, $2, $3, $4)
+	AS f(trial_complete bool, successful_auth bool)
 	`, submission.TrialID, submission.StageNumber, submission.ImageAlias, timeStamp)
 	if err != nil {
 		return nil, err
@@ -67,7 +69,7 @@ func (submission TrialSubmission) Save(db *sql.DB) (*TrialSubmissionResponse, er
 	defer rows.Close()
 
 	for rows.Next() {
-		if err := rows.Scan(&response.TrialComplete, &response.TrialComplete); err != nil {
+		if err := rows.Scan(&response.TrialComplete, &response.SuccessfulAuthentication); err != nil {
 			return nil, err
 		}
 	}

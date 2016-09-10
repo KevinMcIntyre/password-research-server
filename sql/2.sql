@@ -98,12 +98,12 @@ CREATE TABLE uploaded_images (
 CREATE TABLE image_trial_images (
     id BIGSERIAL NOT NULL,
     image BYTEA,
-    image_type VARCHAR(20) NOT NULL,
-    trial_id INTEGER NOT NULL,
-    stage_number INTEGER NOT NULL,
+    image_type VARCHAR(20),
+    trial_id INTEGER,
+    stage_number INTEGER,
     alias VARCHAR(40),
-    row_number INTEGER NOT NULL,
-    column_number INTEGER NOT NULL,
+    row_number INTEGER,
+    column_number INTEGER,
     is_user_image BOOLEAN,
     CONSTRAINT pk_image_trial_images PRIMARY KEY (id)
 );
@@ -199,6 +199,10 @@ INSERT INTO collections (id, label)
 VALUES
   (0, 'NULL');
 
+INSERT INTO image_trial_images (id, image_type)
+VALUES
+    (0, 'IMAGE_NOT_PRESENT');
+
 CREATE FUNCTION duplicate_config_images(trial_id int, config_id int) RETURNS VOID AS $$
 BEGIN
     EXECUTE 'INSERT INTO image_trial_images (image, image_type, trial_id, stage_number, alias, row_number, column_number)
@@ -250,23 +254,41 @@ CREATE FUNCTION submit_image_selection(image_trial_id int, stage int, selected_a
 DECLARE
     result RECORD;
 BEGIN
-    UPDATE image_trial_stage_results
-    SET selected_trial_image_id = subquery.image_id,
-        passed_auth = subquery.passed_auth,
-        end_time = $4
-    FROM (
-        SELECT
-        id AS image_id,
-        CASE WHEN is_user_image IS NULL
-            THEN FALSE
-            ELSE is_user_image
-        END AS passed_auth
-        FROM image_trial_images
-        WHERE trial_id = $1
-        AND stage_number = $2
-        AND alias = $3
-    ) subquery
-    WHERE trial_id = $1 AND stage_number = $2;
+    IF (selected_alias = 'no-pass-image')
+        THEN
+            UPDATE image_trial_stage_results
+            SET selected_trial_image_id = subquery.image_id,
+                passed_auth = subquery.passed_auth,
+                end_time = $4
+            FROM (
+                SELECT 0 AS image_id,
+                CASE WHEN (
+                    SELECT id FROM image_trial_images WHERE trial_id = $1 AND stage_number = $2 AND is_user_image = TRUE
+                ) IS NULL
+                    THEN TRUE
+                    ELSE FALSE
+                END as passed_auth
+            ) subquery
+            WHERE trial_id = $1 AND stage_number = $2;
+        ELSE
+            UPDATE image_trial_stage_results
+            SET selected_trial_image_id = subquery.image_id,
+                passed_auth = subquery.passed_auth,
+                end_time = $4
+            FROM (
+                SELECT
+                id AS image_id,
+                CASE WHEN is_user_image IS NULL
+                    THEN FALSE
+                    ELSE is_user_image
+                END AS passed_auth
+                FROM image_trial_images
+                WHERE trial_id = $1
+                AND stage_number = $2
+                AND alias = $3
+            ) subquery
+            WHERE trial_id = $1 AND stage_number = $2;
+    END IF;
     IF EXISTS (
         SELECT config.stage_count
         FROM image_trials trial
@@ -281,7 +303,7 @@ BEGIN
         IF EXISTS (
             SELECT false
             FROM image_trial_stage_results
-            WHERE trial_id = 1 AND (passed_auth = false OR passed_auth IS NULL)
+            WHERE trial_id = $1 AND (passed_auth = false OR passed_auth IS NULL)
             LIMIT 1
         ) THEN
             SELECT TRUE AS trial_complete, FALSE AS succesful_auth INTO result;
