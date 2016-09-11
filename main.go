@@ -485,10 +485,17 @@ func replaceStageImageHandler(w http.ResponseWriter, r *http.Request, ps httprou
 	configId, _ := strconv.Atoi(r.FormValue("configId"))
 	collectionId, _ := strconv.Atoi(r.FormValue("collectionId"))
 	selectedAlias := r.FormValue("selectedAlias")
+	selectedStageString := r.FormValue("selectedStage")
+	selectedRowString := r.FormValue("selectedRow")
+	selectedColumnString := r.FormValue("selectedColumn")
 	replacementAlias := r.FormValue("replacementAlias")
 	replacementType := r.FormValue("replacementType")
 
-	replacement := models.ReplaceRandomImage(db, configId, collectionId, selectedAlias, replacementAlias, replacementType)
+	selectedStage, _ := strconv.Atoi(selectedStageString)
+	selectedRow, _ := strconv.Atoi(selectedRowString)
+	selectedColumn, _ := strconv.Atoi(selectedColumnString)
+
+	replacement := models.ReplaceRandomImage(db, configId, collectionId, selectedAlias, selectedStage, selectedRow, selectedColumn, replacementAlias, replacementType)
 
 	jsonResponse, err := json.Marshal(replacement)
 	if err != nil {
