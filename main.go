@@ -667,7 +667,67 @@ func getSubjectPassImages(w http.ResponseWriter, r *http.Request, ps httprouter.
 	w.Write(jsonResponse)
 }
 
-func testSettingSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func testSettingImageSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	decoder := json.NewDecoder(r.Body)
+	var trialParams models.TrialRequest
+	err := decoder.Decode(&trialParams)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	trialID, err := trialParams.Save(db)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	trialInfo := models.GetTrialInfoById(db, trialID)
+
+	jsonResponse, err := json.Marshal(trialInfo)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
+	w.Write(jsonResponse)
+}
+
+func testSettingPasswordSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	decoder := json.NewDecoder(r.Body)
+	var trialParams models.TrialRequest
+	err := decoder.Decode(&trialParams)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	trialID, err := trialParams.Save(db)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	trialInfo := models.GetTrialInfoById(db, trialID)
+
+	jsonResponse, err := json.Marshal(trialInfo)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
+	w.Write(jsonResponse)
+}
+
+func testSettingPinSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	decoder := json.NewDecoder(r.Body)
 	var trialParams models.TrialRequest
 	err := decoder.Decode(&trialParams)
@@ -815,7 +875,9 @@ func main() {
 	router.GET("/configs/list", getConfigListHandler)
 
 	router.GET("/test/image/:alias", testImageHandler)
-	router.POST("/test/settings/submit", testSettingSubmitHandler)
+	router.POST("/test/settings/image/submit", testSettingImageSubmitHandler)
+	router.POST("/test/settings/password/submit", testSettingImageSubmitHandler)
+	router.POST("/test/settings/pin/submit", testSettingImageSubmitHandler)
 	router.GET("/trial/list", trialListHandler)
 	router.POST("/trial/start", trialStartHandler)
 	router.POST("/trial/submit", trialSubmitHandler)
