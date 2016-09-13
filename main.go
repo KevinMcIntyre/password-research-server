@@ -669,7 +669,7 @@ func getSubjectPassImages(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 func testSettingImageSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	decoder := json.NewDecoder(r.Body)
-	var trialParams models.TrialRequest
+	var trialParams models.ImageTrialRequest
 	err := decoder.Decode(&trialParams)
 	if err != nil {
 		fmt.Println(err)
@@ -683,7 +683,7 @@ func testSettingImageSubmitHandler(w http.ResponseWriter, r *http.Request, ps ht
 		return
 	}
 
-	trialInfo := models.GetTrialInfoById(db, trialID)
+	trialInfo := models.GetImageTrialInfoById(db, trialID)
 
 	jsonResponse, err := json.Marshal(trialInfo)
 
@@ -699,7 +699,7 @@ func testSettingImageSubmitHandler(w http.ResponseWriter, r *http.Request, ps ht
 
 func testSettingPasswordSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	decoder := json.NewDecoder(r.Body)
-	var trialParams models.TrialRequest
+	var trialParams models.PasswordTrialRequest
 	err := decoder.Decode(&trialParams)
 	if err != nil {
 		fmt.Println(err)
@@ -713,37 +713,7 @@ func testSettingPasswordSubmitHandler(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	trialInfo := models.GetTrialInfoById(db, trialID)
-
-	jsonResponse, err := json.Marshal(trialInfo)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
-	w.Write(jsonResponse)
-}
-
-func testSettingPinSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	decoder := json.NewDecoder(r.Body)
-	var trialParams models.TrialRequest
-	err := decoder.Decode(&trialParams)
-	if err != nil {
-		fmt.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	trialID, err := trialParams.Save(db)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	trialInfo := models.GetTrialInfoById(db, trialID)
+	trialInfo := models.GetImageTrialInfoById(db, trialID)
 
 	jsonResponse, err := json.Marshal(trialInfo)
 
@@ -876,8 +846,7 @@ func main() {
 
 	router.GET("/test/image/:alias", testImageHandler)
 	router.POST("/test/settings/image/submit", testSettingImageSubmitHandler)
-	router.POST("/test/settings/password/submit", testSettingImageSubmitHandler)
-	router.POST("/test/settings/pin/submit", testSettingImageSubmitHandler)
+	router.POST("/test/settings/password/submit", testSettingPasswordSubmitHandler)
 	router.GET("/trial/list", trialListHandler)
 	router.POST("/trial/start", trialStartHandler)
 	router.POST("/trial/submit", trialSubmitHandler)

@@ -25,7 +25,13 @@ type TrialInfo struct {
 	CreationDate time.Time `json:"creationDate"`
 }
 
-type TrialRequest struct {
+type PasswordTrialRequest struct {
+	SubjectID       int `json:"subjectId"`
+	TrialType       int `json:"trialType"`
+	AllowedAttempts int `json:"allowedAttempts"`
+}
+
+type ImageTrialRequest struct {
 	SubjectID      int             `json:"subjectId"`
 	ConfigID       int             `json:"configId"`
 	Stages         int             `json:"stages"`
@@ -77,7 +83,17 @@ func (submission TrialSubmission) Save(db *sql.DB) (*TrialSubmissionResponse, er
 	return &response, nil
 }
 
-func (request TrialRequest) Save(db *sql.DB) (int, error) {
+func (request PasswordTrialRequest) Save(db *sql.DB) (int, error) {
+	return 0, nil
+}
+
+func GetPasswordTrialInfoById(db *sql.DB, trialID int) TrialInfo {
+	trialInfo := new(TrialInfo)
+
+	return *trialInfo
+}
+
+func (request ImageTrialRequest) Save(db *sql.DB) (int, error) {
 	var trialID int
 
 	rows, err := db.Query(`SELECT create_image_trial($1, $2, $3);`,
@@ -173,7 +189,7 @@ func GetTrialList(db *sql.DB) ([]TrialInfo, error) {
 	return trials, nil
 }
 
-func GetTrialInfoById(db *sql.DB, trialID int) TrialInfo {
+func GetImageTrialInfoById(db *sql.DB, trialID int) TrialInfo {
 	trialInfo := new(TrialInfo)
 	db.QueryRow(`
 		SELECT 
