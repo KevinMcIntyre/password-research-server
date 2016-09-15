@@ -87,10 +87,10 @@ func ReplaceRandomImage(db *sql.DB, configId int, collectionId int, selectedAlia
 	return replacedImage
 }
 
-func GetRandomImagesByConfigId(db *sql.DB, configId int) *[]*MatrixImage {
+func GetRandomImagesByConfigId(db *sql.DB, configID int) *[]*MatrixImage {
 	var randomImages []*MatrixImage
 
-	rows, err := db.Query("SELECT alias, stage_number, row_number, column_number FROM random_stage_images WHERE test_config_id = $1;", configId)
+	rows, err := db.Query("SELECT alias, stage_number, row_number, column_number FROM random_stage_images WHERE test_config_id = $1;", configID)
 	if err != nil {
 		fmt.Println(err)
 		// handle error

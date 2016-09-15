@@ -128,21 +128,27 @@ CREATE TABLE image_trials (
     CONSTRAINT pk_image_trials PRIMARY KEY (id)
 );
 
--- CREATE TABLE pin_trials (
---   id                INTEGER       NOT NULL,
---   user_id           INTEGER       NOT NULL,
---   creation_date     TIMESTAMP,
---   notes             TEXT,
---   CONSTRAINT pk_pin_trials PRIMARY KEY (id)
--- );
---
--- CREATE TABLE string_trials (
---   id                INTEGER       NOT NULL,
---   user_id           INTEGER       NOT NULL,
---   creation_date     TIMESTAMP,
---   notes             TEXT,
---   CONSTRAINT pk_string_trials PRIMARY KEY (id)
--- );
+CREATE TABLE password_trials (
+  id                BIGSERIAL     NOT NULL,
+  subject_id        INTEGER       NOT NULL,
+  trial_type        VARCHAR(8)    NOT NULL,
+  attempts_allowed  INTEGER       NOT NULL,
+  passed_auth       BOOLEAN,
+  start_time        TIMESTAMP,
+  end_time          TIMESTAMP,
+  creation_date     TIMESTAMP,
+  notes             TEXT,
+  CONSTRAINT pk_password_trials PRIMARY KEY (id)
+);
+
+CREATE TABLE passwords_submitted (
+    id                  BIGSERIAL       NOT NULL,
+    trial_id            INTEGER         NOT NULL,
+    password_entered    TEXT            NOT NULL,
+    attempt_number      INTEGER         NOT NULL,
+    submission_time     TIMESTAMP       NOT NULL,
+    CONSTRAINT pk_passwords_submitted PRIMARY KEY (id)
+)
 
 --! SEQUENCES !--
 
@@ -157,10 +163,12 @@ CREATE SEQUENCE uploaded_images_seq;
 CREATE SEQUENCE image_trial_images_seq;
 CREATE SEQUENCE image_trial_stage_results_seq;
 CREATE SEQUENCE image_trials_seq;
--- CREATE SEQUENCE pin_trials_seq;
--- CREATE SEQUENCE string_trials_seq;
+CREATE SEQUENCE password_trials_seq;
+CREATE SEQUENCE passwords_submitted_seq;
 
 --! FOREIGN KEY REFERENCES !--
+ ALTER TABLE passwords_submitted ADD CONSTRAINT fk_passwords_submitted_trial_id_01 FOREIGN KEY (trial_id) REFERENCES password_trials(id);
+ ALTER TABLE password_trials ADD CONSTRAINT fk_password_trials_subject_id_01 FOREIGN KEY (subject_id) REFERENCES subjects(id);
  ALTER TABLE image_trial_images ADD CONSTRAINT fk_image_trial_images_trial_id_01 FOREIGN KEY (trial_id) REFERENCES image_trials(id);
  ALTER TABLE image_trial_stage_results ADD CONSTRAINT fk_image_trial_stage_results_selected_image_id_01 FOREIGN KEY (selected_trial_image_id) REFERENCES image_trial_images(id);
  ALTER TABLE image_trial_stage_results ADD CONSTRAINT fk_image_trial_stage_results_trial_id_01 FOREIGN KEY (trial_id) REFERENCES image_trials(id);
@@ -177,6 +185,8 @@ CREATE SEQUENCE image_trials_seq;
 
 --! CREATE INDICES !--
 
+CREATE UNIQUE INDEX passwords_submitted_id ON passwords_submitted (id);
+CREATE UNIQUE INDEX password_trial_id ON password_trials (id);
 CREATE UNIQUE INDEX image_trial_id ON image_trials (id);
 CREATE UNIQUE INDEX image_trial_result_id ON image_trial_stage_results (id);
 CREATE UNIQUE INDEX image_trial_image_id ON image_trial_images (id);
@@ -188,6 +198,8 @@ CREATE UNIQUE INDEX test_config_id ON test_configs (id);
 CREATE UNIQUE INDEX test_config_stage_id ON test_config_stages (id);
 CREATE UNIQUE INDEX test_config_stage_image_id ON test_config_stage_images (id);
 CREATE UNIQUE INDEX uploaded_image_id ON uploaded_images (id);
+
+CREATE INDEX password_trial_type ON password_trials (trial_type);
 
 --! SEED DATA !--
 
@@ -310,6 +322,77 @@ BEGIN
         ELSE
             SELECT TRUE AS trial_complete, TRUE AS succesful_auth INTO result;
         END IF;
+    END IF;
+    RETURN result;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE FUNCTION submit_password_submission(trial_id int, password TEXT, submit_time TIMESTAMP) RETURNS RECORD AS $$
+DECLARE
+    result RECORD;
+BEGIN
+    --! TODO: Check if trial is already complete, if so, return !--
+    
+    --! Insert the password submission !--
+    INSERT INTO passwords_submitted(trial_id, password_entered, attempt_number, submission_time)
+    SELECT
+    $1,
+    $2,
+    attempt_count.attempts + 1,
+    $3
+    FROM (
+        SELECT
+        COUNT(id) AS attempts
+        FROM passwords_submitted
+        WHERE passwords_submitted.trial_id = $1
+    ) AS attempt_count;
+
+    --! Check if authentication is successful and whether or not they have more attempts !--
+    WITH submission_info AS (
+        SELECT
+        CASE WHEN attempts.count >= pt.attempts_allowed
+            THEN false
+            ELSE true
+        END AS more_attempts,
+        CASE WHEN s.password IN (
+            SELECT 
+            password_entered
+            FROM passwords_submitted
+            WHERE passwords_submitted.trial_id = 3
+        )
+            THEN true
+            ELSE false
+        END AS successful_auth
+        FROM password_trials pt
+        JOIN (
+            SELECT
+            3 AS trial_id,
+            COUNT(id) AS count
+            FROM passwords_submitted
+            WHERE passwords_submitted.trial_id = 3
+        ) attempts ON attempts.trial_id = pt.id
+        JOIN subjects s ON s.id = pt.subject_id
+        WHERE pt.id = 3
+    )
+    SELECT
+    CASE WHEN more_attempts = TRUE
+        THEN
+            CASE WHEN successful_auth = TRUE
+                THEN TRUE
+                ELSE FALSE
+            END
+        ELSE
+            TRUE
+    END AS trial_complete,
+    successful_auth 
+    FROM submission_info INTO result;
+    IF (result.trial_complete)
+	THEN
+		UPDATE password_trials
+		SET end_time = now(),
+		    passed_auth = result.successful_auth
+		WHERE password_trials.id = trial_id;
     END IF;
     RETURN result;
 END;

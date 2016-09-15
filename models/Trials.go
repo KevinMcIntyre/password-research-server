@@ -17,18 +17,26 @@ type ImageTrial struct {
 	Matrix               map[string]map[string]map[string]string `json:"matrix"`
 }
 
+type PasswordTrial struct {
+	ID              int    `json:"id"`
+	TrialType       string `json:"trialType"`
+	SubjectName     string `json:"subjectName"`
+	AttemptsAllowed int    `json:"attemptsAllowed"`
+}
+
 type TrialInfo struct {
-	ID           int       `json:"id"`
-	SubjectName  string    `json:"subjectName"`
-	TrialType    string    `json:"trialType"`
-	ConfigName   string    `json:"configName"`
-	CreationDate time.Time `json:"creationDate"`
+	ID              int       `json:"id"`
+	SubjectName     string    `json:"subjectName"`
+	TrialType       string    `json:"trialType"`
+	AttemptsAllowed int       `json:"attemptsAllowed"`
+	ConfigName      string    `json:"configName"`
+	CreationDate    time.Time `json:"creationDate"`
 }
 
 type PasswordTrialRequest struct {
-	SubjectID       int `json:"subjectId"`
-	TrialType       int `json:"trialType"`
-	AllowedAttempts int `json:"allowedAttempts"`
+	SubjectID       int    `json:"subjectId"`
+	TrialType       string `json:"trialType"`
+	AllowedAttempts int    `json:"allowedAttempts"`
 }
 
 type ImageTrialRequest struct {
@@ -45,10 +53,16 @@ type UserPassImage struct {
 	ImageAlias   string `json:"alias"`
 }
 
-type TrialSubmission struct {
+type ImageTrialSubmission struct {
 	TrialID       int    `json:"trialId"`
 	StageNumber   int    `json:"stage"`
 	ImageAlias    string `json:"imageAlias"`
+	UnixTimestamp string `json:"unixTimestamp"`
+}
+
+type PasswordTrialSubmission struct {
+	TrialID       int    `json:"trialId"`
+	Password      string `json:"password"`
 	UnixTimestamp string `json:"unixTimestamp"`
 }
 
@@ -57,7 +71,33 @@ type TrialSubmissionResponse struct {
 	SuccessfulAuthentication bool `json:"successfulAuth"`
 }
 
-func (submission TrialSubmission) Save(db *sql.DB) (*TrialSubmissionResponse, error) {
+func (submission PasswordTrialSubmission) Save(db *sql.DB) (*TrialSubmissionResponse, error) {
+	var response TrialSubmissionResponse
+	timeStamp, err := utils.MsToTime(submission.UnixTimestamp)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.Query(`
+	SELECT *
+	FROM submit_password_submission($1, $2, $3)
+	AS f(trial_complete bool, successful_auth bool)
+	`, submission.TrialID, submission.Password, timeStamp)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		if err := rows.Scan(&response.TrialComplete, &response.SuccessfulAuthentication); err != nil {
+			return nil, err
+		}
+	}
+
+	return &response, nil
+}
+
+func (submission ImageTrialSubmission) Save(db *sql.DB) (*TrialSubmissionResponse, error) {
 	var response TrialSubmissionResponse
 	timeStamp, err := utils.MsToTime(submission.UnixTimestamp)
 	if err != nil {
@@ -84,11 +124,54 @@ func (submission TrialSubmission) Save(db *sql.DB) (*TrialSubmissionResponse, er
 }
 
 func (request PasswordTrialRequest) Save(db *sql.DB) (int, error) {
-	return 0, nil
+	var trialID int
+
+	rows, err := db.Query(`
+		INSERT INTO password_trials(subject_id, trial_type, attempts_allowed, creation_date)
+		VALUES($1, $2, $3, $4)
+		RETURNING id;
+	`,
+		request.SubjectID,
+		request.TrialType,
+		request.AllowedAttempts,
+		time.Now())
+	if err != nil {
+		return 0, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		if err := rows.Scan(&trialID); err != nil {
+			return 0, err
+		}
+	}
+
+	if err != nil {
+		return 0, err
+	}
+	return trialID, nil
 }
 
 func GetPasswordTrialInfoById(db *sql.DB, trialID int) TrialInfo {
 	trialInfo := new(TrialInfo)
+	db.QueryRow(`
+		SELECT 
+		pt.id,
+		s.first_name || ' ' || s.last_name AS subject_name,
+		initcap(pt.trial_type) AS trial_type,
+		pt.attempts_allowed,
+		'N/A' as config_name,
+		pt.creation_date
+		FROM password_trials pt
+		JOIN subjects s ON s.id = pt.subject_id 
+		WHERE pt.id = $1
+	`, trialID).Scan(&trialInfo.ID,
+		&trialInfo.SubjectName,
+		&trialInfo.TrialType,
+		&trialInfo.AttemptsAllowed,
+		&trialInfo.ConfigName,
+		&trialInfo.CreationDate)
 
 	return *trialInfo
 }
@@ -152,21 +235,37 @@ func (request ImageTrialRequest) Save(db *sql.DB) (int, error) {
 
 func GetTrialList(db *sql.DB) ([]TrialInfo, error) {
 	rows, err := db.Query(`
-		SELECT 
-		it.id,
-		s.first_name || ' ' || s.last_name AS subject_name,
-		'Pass-Image' as trial_type,
-		tc.name as config_name,
-		it.creation_date
-		FROM image_trials it
-		JOIN subjects s ON s.id = it.subject_id 
-		JOIN test_configs tc ON tc.id = it.test_config_id
-		WHERE it.id NOT IN (
-			SELECT DISTINCT trial_id
-			FROM image_trial_stage_results
-			WHERE start_time IS NOT NULL
+		WITH trials AS (
+			SELECT
+			it.id AS id,
+			s.first_name || ' ' || s.last_name AS subject_name,
+			'Pass-Image' AS trial_type,
+			1 AS attempts_allowed,
+			tc.name As config_name,
+			it.creation_date AS creation_date
+			FROM image_trials it
+			JOIN subjects s ON s.id = it.subject_id 
+			JOIN test_configs tc ON tc.id = it.test_config_id
+			WHERE it.id NOT IN (
+				SELECT DISTINCT trial_id
+				FROM image_trial_stage_results
+				WHERE start_time IS NOT NULL
+			)
+
+			UNION
+
+			SELECT 
+			pt.id AS id,
+			s.first_name || ' ' || s.last_name AS subject_name,
+			initcap(pt.trial_type) AS trial_type,
+			pt.attempts_allowed AS attempts_allowed,
+			'N/A' AS config_name,
+			pt.creation_date AS creation_date
+			FROM password_trials pt
+			JOIN subjects s ON s.id = pt.subject_id 
+			WHERE pt.start_time IS NULL AND pt.end_time IS NULL AND pt.passed_auth IS NULL
 		)
-		ORDER BY it.creation_date ASC
+		SELECT * FROM trials ORDER BY creation_date ASC
 	`)
 	if err != nil {
 		return nil, err
@@ -179,6 +278,7 @@ func GetTrialList(db *sql.DB) ([]TrialInfo, error) {
 		if err := rows.Scan(&trialInfo.ID,
 			&trialInfo.SubjectName,
 			&trialInfo.TrialType,
+			&trialInfo.AttemptsAllowed,
 			&trialInfo.ConfigName,
 			&trialInfo.CreationDate); err != nil {
 			return nil, err
@@ -196,6 +296,7 @@ func GetImageTrialInfoById(db *sql.DB, trialID int) TrialInfo {
 		it.id,
 		s.first_name || ' ' || s.last_name AS subject_name,
 		'Pass-Image' as trial_type,
+		1 as attempts_allowed,
 		tc.name as config_name,
 		it.creation_date
 		FROM image_trials it
@@ -205,10 +306,31 @@ func GetImageTrialInfoById(db *sql.DB, trialID int) TrialInfo {
 	`, trialID).Scan(&trialInfo.ID,
 		&trialInfo.SubjectName,
 		&trialInfo.TrialType,
+		&trialInfo.AttemptsAllowed,
 		&trialInfo.ConfigName,
 		&trialInfo.CreationDate)
 
 	return *trialInfo
+}
+
+func GetPasswordTrial(db *sql.DB, trialID int) (*PasswordTrial, error) {
+	passwordTrial := new(PasswordTrial)
+
+	err := db.QueryRow(`
+		SELECT 
+		pt.id,
+		s.first_name AS subject_name,
+		initcap(pt.trial_type) AS trial_type,
+		pt.attempts_allowed
+		FROM password_trials pt
+		JOIN subjects s ON s.id = pt.subject_id 
+		WHERE pt.id = $1
+	`, trialID).Scan(&passwordTrial.ID,
+		&passwordTrial.SubjectName,
+		&passwordTrial.TrialType,
+		&passwordTrial.AttemptsAllowed)
+
+	return passwordTrial, err
 }
 
 func GetImageTrial(db *sql.DB, trialId int) (*ImageTrial, error) {

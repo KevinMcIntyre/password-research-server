@@ -414,7 +414,7 @@ func randomStageHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	columns, _ := strconv.Atoi(r.FormValue("columns"))
 
 	randomImages := *services.GetRandomImgurImages(rows * columns * stages)
-	configId := getNewConfigId()
+	configID := getNewConfigId()
 
 	transaction, err := db.Begin()
 	if err != nil {
@@ -428,7 +428,7 @@ func randomStageHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		row := 1
 		column := 1
 		for _, image := range randomImages[((i - 1) * (rows * columns)):(i * rows * columns)] {
-			go image.Save(&wg, transaction, configId, i, row, column)
+			go image.Save(&wg, transaction, configID, i, row, column)
 			if column == columns {
 				column = 1
 				row++
@@ -445,10 +445,11 @@ func randomStageHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		log.Println("Error committing db transaction", err)
 	}
 
-	matrixMap := models.GetMatrixMap(db, models.GetRandomImagesByConfigId(db, configId))
+	randomImagesByConfig := models.GetRandomImagesByConfigId(db, configID)
+	matrixMap := models.GetMatrixMap(db, randomImagesByConfig)
 
 	matrixResponse := new(models.ImageMatrixResponse)
-	matrixResponse.Id = configId
+	matrixResponse.Id = configID
 	matrixResponse.Matrix = *matrixMap
 
 	jsonResponse, err := json.Marshal(matrixResponse)
@@ -713,7 +714,7 @@ func testSettingPasswordSubmitHandler(w http.ResponseWriter, r *http.Request, ps
 		return
 	}
 
-	trialInfo := models.GetImageTrialInfoById(db, trialID)
+	trialInfo := models.GetPasswordTrialInfoById(db, trialID)
 
 	jsonResponse, err := json.Marshal(trialInfo)
 
@@ -750,7 +751,8 @@ func trialListHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 func trialStartHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	decoder := json.NewDecoder(r.Body)
 	trialStartRequest := struct {
-		TrialID int `json:"trialId"`
+		TrialID      int  `json:"trialId"`
+		IsImageTrial bool `json:"isImageTrial"`
 	}{}
 	err := decoder.Decode(&trialStartRequest)
 	if err != nil {
@@ -758,7 +760,69 @@ func trialStartHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	trialData, err := models.GetImageTrial(db, trialStartRequest.TrialID)
+
+	if trialStartRequest.IsImageTrial {
+		startImageTrialHandler(w, trialStartRequest.TrialID)
+	} else {
+		startPasswordTrialHandler(w, trialStartRequest.TrialID)
+	}
+}
+
+func trialStartTimeHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	decoder := json.NewDecoder(r.Body)
+	request := struct {
+		TrialID       int    `json:"trialId"`
+		IsImageTrial  bool   `json:"isImageTrial"`
+		UnixTimestamp string `json:"unixTimestamp"`
+	}{}
+	err := decoder.Decode(&request)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	timeStamp, err := utils.MsToTime(request.UnixTimestamp)
+	if err != nil {
+		timeStamp = time.Now()
+		err = nil
+	}
+
+	if request.IsImageTrial {
+		_, err = db.Query(`
+			UPDATE image_trial_stage_results
+			SET start_time = $2
+			WHERE trial_id = $1 AND stage_number = 1;
+		`, request.TrialID, timeStamp)
+	} else {
+		_, err = db.Query(`
+			UPDATE password_trials
+			SET start_time = $2
+			WHERE id = $1;
+		`, request.TrialID, timeStamp)
+	}
+
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse, err := json.Marshal(struct {
+		Success bool `json:"success"`
+	}{true})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
+	w.Write(jsonResponse)
+}
+
+func startImageTrialHandler(w http.ResponseWriter, trialId int) {
+	trialData, err := models.GetImageTrial(db, trialId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -770,20 +834,60 @@ func trialStartHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		return
 	}
 
-	go db.Query(`
-		UPDATE image_trial_stage_results
-		SET start_time = $2
-		WHERE trial_id = $1 AND stage_number = 1;
-	`, trialStartRequest.TrialID, time.Now())
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
+	w.Write(jsonResponse)
+}
+
+func startPasswordTrialHandler(w http.ResponseWriter, trialID int) {
+	trialData, err := models.GetPasswordTrial(db, trialID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse, err := json.Marshal(*trialData)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
 	w.Write(jsonResponse)
 }
 
-func trialSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func trialImageSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	decoder := json.NewDecoder(r.Body)
-	var trialSubmission models.TrialSubmission
+	var trialSubmission models.ImageTrialSubmission
+	err := decoder.Decode(&trialSubmission)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response, err := trialSubmission.Save(db)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse, err := json.Marshal(response)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
+	w.Write(jsonResponse)
+}
+
+func trialPasswordSubmitHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	decoder := json.NewDecoder(r.Body)
+	var trialSubmission models.PasswordTrialSubmission
 	err := decoder.Decode(&trialSubmission)
 	if err != nil {
 		fmt.Println(err)
@@ -849,7 +953,9 @@ func main() {
 	router.POST("/test/settings/password/submit", testSettingPasswordSubmitHandler)
 	router.GET("/trial/list", trialListHandler)
 	router.POST("/trial/start", trialStartHandler)
-	router.POST("/trial/submit", trialSubmitHandler)
+	router.POST("/trial/set-start-time", trialStartTimeHandler)
+	router.POST("/trial/submit-image", trialImageSubmitHandler)
+	router.POST("/trial/submit-password", trialPasswordSubmitHandler)
 
 	n := negroni.New(
 		negroni.NewRecovery(),
