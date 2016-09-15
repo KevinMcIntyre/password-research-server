@@ -148,7 +148,7 @@ CREATE TABLE passwords_submitted (
     attempt_number      INTEGER         NOT NULL,
     submission_time     TIMESTAMP       NOT NULL,
     CONSTRAINT pk_passwords_submitted PRIMARY KEY (id)
-)
+);
 
 --! SEQUENCES !--
 
@@ -332,67 +332,96 @@ CREATE FUNCTION submit_password_submission(trial_id int, password TEXT, submit_t
 DECLARE
     result RECORD;
 BEGIN
-    --! TODO: Check if trial is already complete, if so, return !--
-    
-    --! Insert the password submission !--
-    INSERT INTO passwords_submitted(trial_id, password_entered, attempt_number, submission_time)
-    SELECT
-    $1,
-    $2,
-    attempt_count.attempts + 1,
-    $3
-    FROM (
-        SELECT
-        COUNT(id) AS attempts
-        FROM passwords_submitted
-        WHERE passwords_submitted.trial_id = $1
-    ) AS attempt_count;
-
-    --! Check if authentication is successful and whether or not they have more attempts !--
-    WITH submission_info AS (
-        SELECT
-        CASE WHEN attempts.count >= pt.attempts_allowed
-            THEN false
-            ELSE true
-        END AS more_attempts,
-        CASE WHEN s.password IN (
-            SELECT 
-            password_entered
-            FROM passwords_submitted
-            WHERE passwords_submitted.trial_id = 3
-        )
-            THEN true
-            ELSE false
-        END AS successful_auth
-        FROM password_trials pt
-        JOIN (
-            SELECT
-            3 AS trial_id,
-            COUNT(id) AS count
-            FROM passwords_submitted
-            WHERE passwords_submitted.trial_id = 3
-        ) attempts ON attempts.trial_id = pt.id
-        JOIN subjects s ON s.id = pt.subject_id
-        WHERE pt.id = 3
+    --! Check if trial is already complete, if so, return the result !--
+    IF (
+	SELECT
+	CASE WHEN passed_auth IS NULL
+		THEN TRUE
+		ELSE FALSE
+	END AS incomplete
+	FROM password_trials WHERE id = $1
     )
-    SELECT
-    CASE WHEN more_attempts = TRUE
         THEN
-            CASE WHEN successful_auth = TRUE
-                THEN TRUE
-                ELSE FALSE
-            END
-        ELSE
-            TRUE
-    END AS trial_complete,
-    successful_auth 
-    FROM submission_info INTO result;
-    IF (result.trial_complete)
-	THEN
-		UPDATE password_trials
-		SET end_time = now(),
-		    passed_auth = result.successful_auth
-		WHERE password_trials.id = trial_id;
+		--! Insert the password submission !--
+		INSERT INTO passwords_submitted(trial_id, password_entered, attempt_number, submission_time)
+		SELECT
+		$1,
+		$2,
+		attempt_count.attempts + 1,
+		$3
+		FROM (
+		SELECT
+		COUNT(id) AS attempts
+		FROM passwords_submitted
+		WHERE passwords_submitted.trial_id = $1
+		) AS attempt_count;
+
+		--! Check if authentication is successful and whether or not they have more attempts !--
+		WITH submission_info AS (
+		SELECT
+		CASE WHEN attempts.count >= pt.attempts_allowed
+		    THEN false
+		    ELSE true
+		END AS more_attempts,
+		CASE WHEN pt.trial_type = 'password'
+		    THEN
+			CASE WHEN s.password IN (
+			    SELECT 
+			    password_entered
+			    FROM passwords_submitted
+			    WHERE passwords_submitted.trial_id = $1
+			)
+			    THEN true
+			    ELSE false
+			END
+		    ELSE
+			CASE WHEN s.pin_number IN (
+			    SELECT 
+			    password_entered
+			    FROM passwords_submitted
+			    WHERE passwords_submitted.trial_id = $1
+			)
+			    THEN true
+			    ELSE false
+			END
+		END AS successful_auth
+		FROM password_trials pt
+		JOIN (
+		    SELECT
+		    $1 AS trial_id,
+		    COUNT(id) AS count
+		    FROM passwords_submitted
+		    WHERE passwords_submitted.trial_id = $1
+		) attempts ON attempts.trial_id = pt.id
+		JOIN subjects s ON s.id = pt.subject_id
+		WHERE pt.id = $1
+		)
+		SELECT
+		CASE WHEN more_attempts = TRUE
+		THEN
+		    CASE WHEN successful_auth = TRUE
+			THEN TRUE
+			ELSE FALSE
+		    END
+		ELSE
+		    TRUE
+		END AS trial_complete,
+		successful_auth 
+		FROM submission_info INTO result;
+		IF (result.trial_complete)
+		THEN
+			UPDATE password_trials
+			SET end_time = now(),
+			    passed_auth = result.successful_auth
+			WHERE password_trials.id = $1;
+		END IF;
+	ELSE
+		SELECT
+		TRUE AS trial_complete,
+		passed_auth AS successful_auth
+		FROM password_trials
+		WHERE id = $1 INTO result;
+		
     END IF;
     RETURN result;
 END;
