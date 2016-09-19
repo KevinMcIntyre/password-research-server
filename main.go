@@ -267,7 +267,12 @@ func errorHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 }
 
 func getSubjectListHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	subjectList := models.GetSubjectList(db)
+	subjectList, err := models.GetSubjectList(db)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	jsonResponse, err := json.Marshal(subjectList)
 	if err != nil {

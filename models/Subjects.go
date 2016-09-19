@@ -15,9 +15,12 @@ type NewSubjectRequest struct {
 	Birthday  string
 }
 
-type SubjectNameAndId struct {
-	Id   int
-	Name string
+type SubjectData struct {
+	Id          int
+	Name        string
+	PasswordSet bool
+	PinSet      bool
+	ImagesSet   bool
 }
 
 type SubjectProfile struct {
@@ -97,41 +100,61 @@ func GetSubjectProfileById(db *sql.DB, subjectId int) SubjectProfile {
 	return profile
 }
 
-func GetSubjectList(db *sql.DB) []SubjectNameAndId {
-	rows, err := db.Query("SELECT id, first_name, last_name FROM subjects WHERE id != 0 ORDER BY UPPER(last_name) ASC, UPPER(first_name) ASC")
+func GetSubjectList(db *sql.DB) ([]SubjectData, error) {
+	rows, err := db.Query(`
+	WITH users_with_images_set AS (
+		SELECT DISTINCT(subject_id)
+		FROM saved_images
+	)
+	SELECT
+	id,
+	first_name,
+	last_name,
+	CASE WHEN password IS NOT NULL
+		THEN true
+		ELSE false
+	END AS password_set,
+	CASE WHEN pin_number IS NOT NULL
+		THEN true
+		ELSE false
+	END AS pin_set,
+	CASE WHEN id IN (SELECT * FROM users_with_images_set)
+		THEN true
+		ELSE false
+	END AS images_set
+	FROM subjects
+	WHERE id != 0
+	ORDER BY UPPER(last_name) ASC, UPPER(first_name) ASC`)
 	if err != nil {
-		fmt.Println(err)
-		// handle error
+		return nil, err
 	}
 
-	var subjectList []SubjectNameAndId
+	var subjectList []SubjectData
 	for rows.Next() {
-		SubjectNameAndId := new(SubjectNameAndId)
+		subjectData := new(SubjectData)
 		var firstName string
 		var lastName string
-		if err := rows.Scan(&SubjectNameAndId.Id, &firstName, &lastName); err != nil {
-			fmt.Println(err)
-			fmt.Println(err)
-			// handle error
+		if err := rows.Scan(&subjectData.Id, &firstName, &lastName, &subjectData.PasswordSet, &subjectData.PinSet, &subjectData.ImagesSet); err != nil {
+			return nil, err
 		}
-		SubjectNameAndId.Name = lastName + ", " + firstName
-		subjectList = append(subjectList, *SubjectNameAndId)
+		subjectData.Name = lastName + ", " + firstName
+		subjectList = append(subjectList, *subjectData)
 	}
 
-	return subjectList
+	return subjectList, nil
 }
 
 func GetSubjectPassImages(db *sql.DB, subjectId int) ([]string, error) {
 	rows, err := db.Query(`SELECT alias FROM saved_images WHERE subject_id = $1`, subjectId)
-	if (err != nil) {
+	if err != nil {
 		return nil, err
 	}
 	var passImageList []string
 	for rows.Next() {
 		var passImageAlias string
-		err = rows.Scan(&passImageAlias);
+		err = rows.Scan(&passImageAlias)
 		passImageList = append(passImageList, passImageAlias)
 	}
 
-	return passImageList, err;
+	return passImageList, err
 }
