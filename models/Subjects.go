@@ -34,6 +34,133 @@ type SubjectProfile struct {
 	PinNumber        sql.NullString
 }
 
+type SubjectTrialRecord struct {
+	SubjectID       int       `json:"subjectId"`
+	TrialID         int       `json:"trialId"`
+	TrialType       string    `json:"trialType"`
+	ConfigID        int       `json:"configId"`
+	ImageConfigName string    `json:"imageConfig"`
+	AttemptsAllowed int       `json:"attemptsAllowed"`
+	AttemptsTaken   int       `json:"attemptsTaken"`
+	SuccessfulAuth  bool      `json:"successfulAuth"`
+	DateTaken       time.Time `json:"dateTaken"`
+}
+
+func GetSubjectTrialResults(db *sql.DB, subjectId int) ([]SubjectTrialRecord, error) {
+	rows, err := db.Query(`
+		WITH image_trial_results AS (
+			SELECT
+			it.subject_id,
+			it.id AS trial_id,
+			'Pass-Image'::TEXT AS trial_type,
+			it.test_config_id AS config_id,
+			tc.name AS config_name,
+			1 AS attempts_allowed,
+			1 AS attempts_taken,
+			CASE WHEN image_stage_success_counts.successful_auths = tc.stage_count
+				THEN TRUE
+				ELSE FALSE
+			END AS successful_auth,
+			start_times.start_time,
+			CASE WHEN completed_stages.count = tc.stage_count
+			THEN TRUE
+			ELSE FALSE
+			END AS trial_complete
+			FROM image_trials it
+			JOIN test_configs tc ON tc.id = it.test_config_id
+			JOIN (
+				SELECT trial_id, count(passed_auth) AS successful_auths
+				FROM image_trial_stage_results
+				WHERE passed_auth = true
+				GROUP BY trial_id
+			) AS image_stage_success_counts ON image_stage_success_counts.trial_id = it.id
+			JOIN (
+				SELECT trial_id, start_time
+				FROM image_trial_stage_results
+				WHERE stage_number = 1
+			) AS start_times ON start_times.trial_id = it.id
+			JOIN (
+				SELECT trial_id, count(end_time) AS count
+				FROM image_trial_stage_results
+				GROUP BY trial_id
+			) AS completed_stages ON completed_stages.trial_id = it.id
+			WHERE it.subject_id = $1
+		),
+		password_trial_results AS (
+			SELECT
+			subject_id,
+			id AS trial_id,
+			initcap(pt.trial_type) AS trial_type,
+			0 as config_id,
+			'N/A'::TEXT AS config_name,
+			pt.attempts_allowed,
+			attempts_taken.count AS attempts_taken,
+			pt.passed_auth AS successful_auth,
+			pt.start_time
+			FROM password_trials pt
+			JOIN (
+				SELECT trial_id, count(trial_id) AS count
+				FROM passwords_submitted
+				GROUP BY trial_id
+			) AS attempts_taken ON attempts_taken.trial_id = pt.id
+			WHERE pt.subject_id = $1 AND pt.passed_auth IS NOT NULL
+		)
+		SELECT *
+		FROM (
+			SELECT
+			subject_id,
+			trial_id,
+			trial_type,
+			config_id,
+			config_name,
+			attempts_allowed,
+			attempts_taken,
+			successful_auth,
+			start_time
+			FROM image_trial_results
+			WHERE trial_complete = true
+
+			UNION
+
+			SELECT
+			subject_id,
+			trial_id,
+			trial_type,
+			config_id,
+			config_name,
+			attempts_allowed,
+			attempts_taken,
+			successful_auth,
+			start_time
+			FROM password_trial_results
+		) aggragated_results
+		ORDER BY start_time ASC;
+	`, subjectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var trialRecords []SubjectTrialRecord
+	for rows.Next() {
+		trialRecord := new(SubjectTrialRecord)
+		if err := rows.Scan(
+			&trialRecord.SubjectID,
+			&trialRecord.TrialID,
+			&trialRecord.TrialType,
+			&trialRecord.ConfigID,
+			&trialRecord.ImageConfigName,
+			&trialRecord.AttemptsAllowed,
+			&trialRecord.AttemptsTaken,
+			&trialRecord.SuccessfulAuth,
+			&trialRecord.DateTaken); err != nil {
+			return nil, err
+		}
+		trialRecords = append(trialRecords, *trialRecord)
+	}
+
+	return trialRecords, nil
+}
+
 func (request NewSubjectRequest) Validate() ([]string, time.Time) {
 	errorFields := make([]string, 0)
 	var birthday time.Time

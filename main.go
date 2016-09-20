@@ -918,6 +918,31 @@ func trialPasswordSubmitHandler(w http.ResponseWriter, r *http.Request, ps httpr
 	w.Write(jsonResponse)
 }
 
+func subjectTrialsHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	subjectIDString := ps.ByName("id")
+	subjectID, err := strconv.Atoi(subjectIDString)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	subjectTrialResults, err := models.GetSubjectTrialResults(db, subjectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse, err := json.Marshal(subjectTrialResults)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
+	w.Write(jsonResponse)
+}
+
 func main() {
 	defer db.Close()
 
@@ -927,6 +952,7 @@ func main() {
 	router.GET("/subject/profile/:id", getSubjectHandler)
 	router.GET("/subject/images/:id", getSubjectPassImages)
 	router.GET("/subject/list", getSubjectListHandler)
+	router.GET("/subject/trials/:id", subjectTrialsHandler)
 	router.POST("/subject/save/password", saveSubjectPasswordHandler)
 	router.POST("/subject/save/pin", saveSubjectPinHandler)
 
