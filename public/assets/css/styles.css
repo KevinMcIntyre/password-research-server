@@ -17,3 +17,7 @@
 .btn-group > .btn {
   margin-right: 5px;;
 }
+
+.passwordField__meter {
+  margin-left: 15px;
+}

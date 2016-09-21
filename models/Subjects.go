@@ -134,7 +134,7 @@ func GetSubjectTrialResults(db *sql.DB, subjectId int) ([]SubjectTrialRecord, er
 			start_time
 			FROM password_trial_results
 		) aggragated_results
-		ORDER BY start_time ASC;
+		ORDER BY start_time DESC;
 	`, subjectId)
 	if err != nil {
 		return nil, err

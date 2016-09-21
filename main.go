@@ -943,6 +943,41 @@ func subjectTrialsHandler(w http.ResponseWriter, r *http.Request, ps httprouter.
 	w.Write(jsonResponse)
 }
 
+func trialDetailHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	decoder := json.NewDecoder(r.Body)
+	request := struct {
+		TrialID      int  `json:"trialId"`
+		IsImageTrial bool `json:"isImageTrial"`
+	}{}
+	err := decoder.Decode(&request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var jsonResponse []byte
+
+	if request.IsImageTrial {
+		trialDetails, err := models.GetImageTrialDetails(db, request.TrialID)
+		if err == nil {
+			jsonResponse, err = json.Marshal(trialDetails)
+		}
+	} else {
+		trialDetails, err := models.GetPasswordTrialDetails(db, request.TrialID)
+		if err == nil {
+			jsonResponse, err = json.Marshal(trialDetails)
+		}
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(jsonResponse)))
+	w.Write(jsonResponse)
+}
+
 func main() {
 	defer db.Close()
 
@@ -984,6 +1019,7 @@ func main() {
 	router.POST("/test/settings/password/submit", testSettingPasswordSubmitHandler)
 	router.GET("/trial/list", trialListHandler)
 	router.POST("/trial/start", trialStartHandler)
+	router.POST("/trial/details", trialDetailHandler)
 	router.POST("/trial/set-start-time", trialStartTimeHandler)
 	router.POST("/trial/submit-image", trialImageSubmitHandler)
 	router.POST("/trial/submit-password", trialPasswordSubmitHandler)

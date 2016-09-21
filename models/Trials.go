@@ -71,6 +71,30 @@ type TrialSubmissionResponse struct {
 	SuccessfulAuthentication bool `json:"successfulAuth"`
 }
 
+type ImageTrialDetail struct {
+	StageNumber        int      `json:"stage"`
+	SelectedImageAlias string   `json:"selectedAlias"`
+	CorrectImageAlias  []string `json:"correctAlias"`
+	Success            bool     `json:"success"`
+	TimeSpentInSeconds string   `json:"timeSpentInSeconds"`
+}
+
+type PasswordTrialDetail struct {
+	StageNumber        int      `json:"stage"`
+	SelectedImageAlias string   `json:"selectedAlias"`
+	CorrectImageAlias  []string `json:"correctAlias"`
+	Success            bool     `json:"success"`
+	TimeSpentInSeconds string   `json:"timeSpentInSeconds"`
+}
+
+func GetImageTrialDetails(db *sql.DB, trialId int) ([]ImageTrialDetail, error) {
+	return nil, nil
+}
+
+func GetPasswordTrialDetails(db *sql.DB, trialId int) ([]PasswordTrialDetail, error) {
+	return nil, nil
+}
+
 func (submission PasswordTrialSubmission) Save(db *sql.DB) (*TrialSubmissionResponse, error) {
 	var response TrialSubmissionResponse
 	timeStamp, err := utils.MsToTime(submission.UnixTimestamp)
