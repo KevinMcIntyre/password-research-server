@@ -961,11 +961,17 @@ func trialDetailHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 		trialDetails, err := models.GetImageTrialDetails(db, request.TrialID)
 		if err == nil {
 			jsonResponse, err = json.Marshal(trialDetails)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	} else {
 		trialDetails, err := models.GetPasswordTrialDetails(db, request.TrialID)
 		if err == nil {
 			jsonResponse, err = json.Marshal(trialDetails)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 	if err != nil {

@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/KevinMcIntyre/password-research-server/utils"
@@ -76,23 +77,147 @@ type ImageTrialDetail struct {
 	SelectedImageAlias string   `json:"selectedAlias"`
 	CorrectImageAlias  []string `json:"correctAlias"`
 	Success            bool     `json:"success"`
-	TimeSpentInSeconds string   `json:"timeSpentInSeconds"`
+	TimeSpentInSeconds float64  `json:"timeSpentInSeconds"`
 }
 
 type PasswordTrialDetail struct {
-	StageNumber        int      `json:"stage"`
-	SelectedImageAlias string   `json:"selectedAlias"`
-	CorrectImageAlias  []string `json:"correctAlias"`
-	Success            bool     `json:"success"`
-	TimeSpentInSeconds string   `json:"timeSpentInSeconds"`
+	AttemptNumber      int     `json:"attemptNumber"`
+	PasswordEntered    string  `json:"passwordEntered"`
+	CorrectPassword    string  `json:"correctPassword"`
+	Success            bool    `json:"success"`
+	TimeSpentInSeconds float64 `json:"timeSpentInSeconds"`
 }
 
 func GetImageTrialDetails(db *sql.DB, trialId int) ([]ImageTrialDetail, error) {
-	return nil, nil
+	rows, err := db.Query(`
+		SELECT
+		stage_results.stage_number,
+		CASE WHEN images.alias IS NULL
+			THEN ''
+			ELSE images.alias
+		END AS selected_image,
+		CASE WHEN correct_images.user_images IS NULL
+			THEN '{}'
+			ELSE correct_images.user_images
+		END AS user_images,
+		stage_results.passed_auth AS success,
+		stage_results.start_time,
+		stage_results.end_time
+		FROM image_trial_stage_results stage_results
+		JOIN image_trial_images images ON images.id = stage_results.selected_trial_image_id
+		FULL JOIN (
+			SELECT trial_id, stage_number, array_agg(alias) AS user_images
+			FROM image_trial_images
+			WHERE trial_id = $1 AND is_user_image = true
+			GROUP BY trial_id, stage_number
+		) AS correct_images ON concat(correct_images.trial_id, correct_images.stage_number) = concat(stage_results.trial_id, stage_results.stage_number)
+		WHERE stage_results.trial_id = $1
+		ORDER BY stage_number ASC
+	`, trialId)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var trialDetails []ImageTrialDetail
+	for rows.Next() {
+		trialDetail := new(ImageTrialDetail)
+		startTime := new(time.Time)
+		endTime := new(time.Time)
+		correctImageAliasArrayString := new(string)
+		if err := rows.Scan(
+			&trialDetail.StageNumber,
+			&trialDetail.SelectedImageAlias,
+			correctImageAliasArrayString,
+			&trialDetail.Success,
+			&startTime,
+			&endTime); err != nil {
+			fmt.Println(err.Error())
+			return nil, err
+		}
+		testDuration := endTime.Sub(*startTime)
+		correctImageAliasArray, err := utils.ParsePGArray(*correctImageAliasArrayString)
+		if err != nil {
+			fmt.Println(err.Error())
+			return nil, err
+		}
+		trialDetail.CorrectImageAlias = correctImageAliasArray
+		trialDetail.TimeSpentInSeconds = utils.RoundUp(testDuration.Seconds(), 2)
+
+		trialDetails = append(trialDetails, *trialDetail)
+	}
+	return trialDetails, nil
 }
 
 func GetPasswordTrialDetails(db *sql.DB, trialId int) ([]PasswordTrialDetail, error) {
-	return nil, nil
+	rows, err := db.Query(`
+	SELECT
+	submitted.attempt_number,
+	submitted.password_entered,
+	CASE WHEN trial.trial_type = 'pin'
+		THEN subjects.pin_number
+		ELSE subjects.password
+	END AS correct_password,
+	CASE WHEN trial.trial_type = 'pin'
+		THEN
+		CASE WHEN submitted.password_entered = subjects.pin_number
+			THEN true
+			ELSE false
+		END
+		ELSE
+		CASE WHEN submitted.password_entered = subjects.password
+			THEN true
+			ELSE false
+		END
+	END AS success,
+	start_times.start_time,
+	submitted.submission_time
+	FROM passwords_submitted submitted
+	JOIN password_trials trial ON trial.id = submitted.trial_id
+	JOIN subjects ON subjects.id = trial.subject_id
+	JOIN (
+		SELECT
+			attempt_number,
+			CASE WHEN attempt_number = 1
+			THEN trial.start_time
+			ELSE lag(submission_time) OVER submission_window
+			END AS start_time
+		FROM passwords_submitted submitted
+		JOIN password_trials trial ON trial.id = submitted.trial_id
+		WHERE submitted.trial_id = $1
+		WINDOW submission_window as (partition by trial_id order by attempt_number)
+	) AS start_times ON start_times.attempt_number = submitted.attempt_number
+	WHERE submitted.trial_id = $1
+	ORDER BY submitted.attempt_number
+	`, trialId)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var trialDetails []PasswordTrialDetail
+	for rows.Next() {
+		trialDetail := new(PasswordTrialDetail)
+		startTime := new(time.Time)
+		endTime := new(time.Time)
+		if err := rows.Scan(
+			&trialDetail.AttemptNumber,
+			&trialDetail.PasswordEntered,
+			&trialDetail.CorrectPassword,
+			&trialDetail.Success,
+			&startTime,
+			&endTime); err != nil {
+			fmt.Println(err.Error())
+			return nil, err
+		}
+		testDuration := endTime.Sub(*startTime)
+		trialDetail.TimeSpentInSeconds = utils.RoundUp(testDuration.Seconds(), 2)
+
+		trialDetails = append(trialDetails, *trialDetail)
+	}
+	return trialDetails, nil
 }
 
 func (submission PasswordTrialSubmission) Save(db *sql.DB) (*TrialSubmissionResponse, error) {
