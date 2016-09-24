@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/KevinMcIntyre/password-research-server/jobs"
 	"github.com/KevinMcIntyre/password-research-server/models"
 	"github.com/KevinMcIntyre/password-research-server/services"
 	"github.com/KevinMcIntyre/password-research-server/utils"
@@ -984,6 +985,18 @@ func trialDetailHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	w.Write(jsonResponse)
 }
 
+func exportHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	err := jobs.CreateCSVFiles(db)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	response := []byte("{success: true}")
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(response)))
+	w.Write(response)
+}
+
 func main() {
 	defer db.Close()
 
@@ -1029,6 +1042,7 @@ func main() {
 	router.POST("/trial/set-start-time", trialStartTimeHandler)
 	router.POST("/trial/submit-image", trialImageSubmitHandler)
 	router.POST("/trial/submit-password", trialPasswordSubmitHandler)
+	router.GET("/export", exportHandler)
 
 	n := negroni.New(
 		negroni.NewRecovery(),
