@@ -13,6 +13,10 @@
 			"Rev": "546cb3c5137b3f1232e123a26aa033aade6b3066"
 		},
 		{
+			"ImportPath": "github.com/gocarina/gocsv",
+			"Rev": "61fd80d5baff972e0c676d9150bc7670e8bb177f"
+		},
+		{
 			"ImportPath": "github.com/julienschmidt/httprouter",
 			"Comment": "v1.1-16-gabb0dc9",
 			"Rev": "abb0dc9f755ff0a9d818db28d9d8b9810066e2b5"
