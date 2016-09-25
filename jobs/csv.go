@@ -2,9 +2,10 @@ package jobs
 
 import (
 	"database/sql"
-	"github.com/gocarina/gocsv"
 	"os"
 	"time"
+
+	"github.com/gocarina/gocsv"
 )
 
 type Subject struct {
@@ -66,6 +67,16 @@ type ImageTrial struct {
 	PassedAuth   string `csv:"PASSED_AUTH"`
 	Notes        string `csv:"NOTES"`
 	CreationDate string `csv:"CREATION_DATE"`
+}
+
+type ImageTrialStage struct {
+	ID            string `csv:"ID"`
+	StageNumber   string `csv:"STAGE_NUMBER"`
+	ImageSelected string `csv:"IMAGE_SELECTED"`
+	CorrectImages string `csv:"CORRECT_IMAGES"`
+	PassedAuth    string `csv:"PASSED_AUTH"`
+	StartTime     string `csv:"START_TIME"`
+	EndTime       string `csv:"END_TIME"`
 }
 
 func getAllImageTrialData(db *sql.DB) ([]ImageTrial, error) {
@@ -136,7 +147,7 @@ func getAllImageTrialData(db *sql.DB) ([]ImageTrial, error) {
 }
 
 func getAllImageConfigData(db *sql.DB) ([]ImageTrialConfig, error) {
-	rows, err := db.Query(`SELECT * FROM test_configs`)
+	rows, err := db.Query(`SELECT * FROM test_configs WHERE name IS NOT NULL`)
 	if err != nil {
 		return nil, err
 	}
@@ -257,10 +268,7 @@ func getAllPasswordTrialData(db *sql.DB, isPinNumber bool) ([]PasswordTrial, err
 		THEN ''
 		ELSE attempts_allowed::varchar
 	END AS attempts_allowed,
-	CASE WHEN passed_auth IS NULL
-		THEN ''
-		ELSE passed_auth::varchar
-	END AS passed_auth,
+	passed_auth::varchar,
 	CASE WHEN start_time IS NULL
 		THEN ''
 		ELSE start_time::varchar
@@ -278,7 +286,7 @@ func getAllPasswordTrialData(db *sql.DB, isPinNumber bool) ([]PasswordTrial, err
 		ELSE creation_date::varchar
 	END AS creation_date
 	FROM password_trials
-	WHERE trial_type =` + whereclauseParam)
+	WHERE passed_auth IS NOT NULL AND trial_type =` + whereclauseParam)
 	if err != nil {
 		return nil, err
 	}
