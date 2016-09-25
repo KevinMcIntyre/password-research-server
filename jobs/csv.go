@@ -71,12 +71,80 @@ type ImageTrial struct {
 
 type ImageTrialStage struct {
 	ID            string `csv:"ID"`
+	TrialID       string `csv:"TRIAL_ID"`
 	StageNumber   string `csv:"STAGE_NUMBER"`
-	ImageSelected string `csv:"IMAGE_SELECTED"`
+	SelectedImage string `csv:"SELECTED_IMAGE"`
 	CorrectImages string `csv:"CORRECT_IMAGES"`
 	PassedAuth    string `csv:"PASSED_AUTH"`
 	StartTime     string `csv:"START_TIME"`
 	EndTime       string `csv:"END_TIME"`
+}
+
+func getAllImageTrialStageData(db *sql.DB) ([]ImageTrialStage, error) {
+	rows, err := db.Query(`
+	SELECT
+	stages.id::VARCHAR,
+	stages.trial_id::VARCHAR,
+	stages.stage_number::VARCHAR,
+	CASE WHEN selected_trial_image_id != 0
+		THEN concat('"', concat('Row: ', images.row_number::VARCHAR, ' Column: ', images.column_number::VARCHAR), '"')
+		ELSE '"None"'
+	END AS selected_image,
+	CASE WHEN correct_images IS NOT NULL
+		THEN correct_images.correct_images
+		ELSE '"None"'
+	END AS correct_images,
+	stages.passed_auth::VARCHAR,
+	stages.start_time::VARCHAR,
+	stages.end_time::VARCHAR
+	FROM image_trial_stage_results stages
+	JOIN image_trial_images images ON images.id = stages.selected_trial_image_id
+	FULL JOIN (
+		SELECT trial_id, stage_number, concat('"', string_agg(concat('Row: ', row_number::VARCHAR, ' Column: ', column_number::VARCHAR), ', '), '"') AS correct_images
+		FROM image_trial_images WHERE is_user_image = true
+		GROUP BY trial_id, stage_number
+	) AS correct_images ON concat('trial', correct_images.trial_id, 'stage', correct_images.stage_number) = concat('trial', stages.trial_id, 'stage', stages.stage_number)
+	WHERE stages.trial_id IN (
+		WITH counts AS (
+			SELECT
+			stages.trial_id,
+			count(stages.end_time) AS count
+			FROM image_trial_stage_results stages
+			GROUP BY stages.trial_id
+		)
+		SELECT
+		counts.trial_id
+		FROM counts
+		JOIN image_trials trials ON trials.id = counts.trial_id
+		JOIN test_configs configs ON configs.id = trials.test_config_id
+		WHERE counts.count = configs.stage_count
+	)
+	ORDER BY trial_id ASC, stage_number ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	var trialStages []ImageTrialStage
+	for rows.Next() {
+		var stage ImageTrialStage
+		err := rows.Scan(
+			&stage.ID,
+			&stage.TrialID,
+			&stage.StageNumber,
+			&stage.SelectedImage,
+			&stage.CorrectImages,
+			&stage.PassedAuth,
+			&stage.StartTime,
+			&stage.EndTime,
+		)
+		if err != nil {
+			return nil, err
+		}
+		trialStages = append(trialStages, stage)
+	}
+
+	return trialStages, nil
 }
 
 func getAllImageTrialData(db *sql.DB) ([]ImageTrial, error) {
@@ -439,6 +507,15 @@ func CreateCSVFiles(db *sql.DB) error {
 		return err
 	}
 	err = createCSV(dirName, "image_trials.csv", &imageTrials)
+	if err != nil {
+		return err
+	}
+
+	imageTrialStages, err := getAllImageTrialStageData(db)
+	if err != nil {
+		return err
+	}
+	err = createCSV(dirName, "image_trials_stages.csv", &imageTrialStages)
 	if err != nil {
 		return err
 	}
