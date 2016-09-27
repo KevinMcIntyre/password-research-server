@@ -15,6 +15,17 @@ import (
 	"github.com/disintegration/imaging"
 )
 
+func FileExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return true, err
+}
+
 func RoundUp(input float64, places int) float64 {
 	var round float64
 	pow := math.Pow(10, float64(places))

@@ -986,7 +986,7 @@ func trialDetailHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 }
 
 func exportHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	err := jobs.CreateCSVFiles(db)
+	err := jobs.ExportData(db)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
