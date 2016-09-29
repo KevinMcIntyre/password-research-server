@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -986,15 +987,23 @@ func trialDetailHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 }
 
 func exportHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	err := jobs.ExportData(db)
+	timeString := time.Now().Format("01_02_2006_150405")
+	pathToZip, err := jobs.ExportData(db, timeString)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	response := []byte("{success: true}")
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Length", strconv.Itoa(len(response)))
-	w.Write(response)
+
+	zippedBytes, err := ioutil.ReadFile(pathToZip)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Length", strconv.Itoa(len(zippedBytes)))
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+timeString+".zip"+"\"")
+	w.Write(zippedBytes)
 }
 
 func main() {

@@ -363,12 +363,13 @@ func (request ImageTrialRequest) Save(db *sql.DB) (int, error) {
 				replace(md5(random() :: TEXT || clock_timestamp() :: TEXT), '-' :: TEXT, '' :: TEXT) :: VARCHAR(60) AS alias
 				FROM saved_images WHERE alias = $1 AND subject_id = $2
 			) as subject_image
-			WHERE stage_number = $3 AND row_number = $4 AND column_number = $5;
+			WHERE trial_id = $6 AND stage_number = $3 AND row_number = $4 AND column_number = $5;
 		`, userPassImage.ImageAlias,
 			request.SubjectID,
 			userPassImage.StageNumber,
 			userPassImage.RowNumber,
-			userPassImage.ColumnNumber)
+			userPassImage.ColumnNumber,
+			trialID)
 		if err != nil {
 			return 0, err
 		}
