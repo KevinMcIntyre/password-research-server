@@ -23,7 +23,7 @@ type ImgurImage struct {
 	Type    string `json:"type"`
 	Width   int    `json:"width"`
 	Height  int    `json:"height"`
-	Nsfw    bool   `json: "nsfw"`
+	Nsfw    bool   `json:"nsfw"`
 	Link    string `json:"link"`
 	IsAlbum bool   `json:"is_album"`
 }
@@ -37,7 +37,7 @@ type ImgurResponse struct {
 func (imgur ImgurImage) Save(waitgroup *sync.WaitGroup, transaction *sql.Tx, testConfigId int, stage int, row int, column int) {
 	defer waitgroup.Done()
 	filePath := imgurImageToFile(imgur)
-	utils.ResizeImage(*filePath)
+	//utils.ResizeImage(*filePath)
 	imageBytes := utils.ImageFileToByteArray(*filePath)
 	_, err := transaction.Exec("INSERT INTO random_stage_images (image, image_type, test_config_id, stage_number, row_number, column_number, alias, creation_date) VALUES($1, $2, $3, $4, $5, $6, replace(md5(random()::text || clock_timestamp()::text), '-'::text, ''::text)::varchar(60), $7);",
 		imageBytes, imgur.Type, testConfigId, stage, row, column, time.Now())
@@ -60,8 +60,14 @@ func (imgur ImgurImage) Replace(db *sql.DB, testConfigId int, replacingAlias str
 	return alias
 }
 
+func turnImgurLinkIntoMediumThumbnail(URL string) string {
+	splitUrl := URL[0:strings.LastIndex(URL, ".")]
+	extension := URL[strings.LastIndex(URL, "."):len(URL)]
+	return splitUrl + "b" + extension
+}
+
 func imgurImageToFile(imgur ImgurImage) *string {
-	response, e := http.Get(imgur.Link)
+	response, e := http.Get(turnImgurLinkIntoMediumThumbnail(imgur.Link))
 	if e != nil {
 		log.Println("Error converting imgur image []Byte", e)
 		return nil
