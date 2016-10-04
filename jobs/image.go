@@ -276,9 +276,9 @@ func saveConfigImages(dirName string, configImages []ConfigImage) error {
 	return nil
 }
 
-func saveTrialUserImages(dirName string, configImages []TrialUserImage) error {
+func saveTrialUserImages(dirName string, trialUserImages []TrialUserImage) error {
 	os.Mkdir(dirName+"/trial_pass_images", os.ModePerm)
-	for _, img := range configImages {
+	for _, img := range trialUserImages {
 		imgDirName := dirName + "/trial_pass_images/" + img.TrialID + "_" + img.TrialDate.Format("01-02-2006_15-04-05")
 		directoryExists, err := utils.FileExists(imgDirName)
 		if err != nil {
