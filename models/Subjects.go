@@ -13,6 +13,7 @@ type NewSubjectRequest struct {
 	LastName  string
 	Email     string
 	Birthday  string
+	Sex       string
 }
 
 type SubjectData struct {
@@ -28,6 +29,7 @@ type SubjectProfile struct {
 	LastName         string
 	Email            string
 	Birthday         time.Time
+	Sex              string
 	Password         sql.NullString
 	PasswordStrength sql.NullInt64
 	PasswordEntropy  sql.NullFloat64
@@ -173,6 +175,10 @@ func (request NewSubjectRequest) Validate() ([]string, time.Time) {
 		errorFields = append(errorFields, "lastName")
 	}
 
+	if utils.IsEmptyString(request.Sex) {
+		errorFields = append(errorFields, "sex")
+	}
+
 	if utils.IsEmptyString(request.Email) || !utils.IsValidEmail(request.Email) {
 		errorFields = append(errorFields, "email")
 	}
@@ -193,7 +199,7 @@ func (request NewSubjectRequest) Validate() ([]string, time.Time) {
 
 func SaveNewSubject(db *sql.DB, profile NewSubjectRequest, birthday time.Time) int {
 	var newSubjectId int
-	err := db.QueryRow("INSERT INTO subjects(email, first_name, last_name, birth_date, creation_date) VALUES($1, $2, $3, $4, $5) returning id", profile.Email, profile.FirstName, profile.LastName, birthday, time.Now()).Scan(&newSubjectId)
+	err := db.QueryRow("INSERT INTO subjects(email, first_name, last_name, birth_date, sex, creation_date) VALUES($1, $2, $3, $4, $5, $6) returning id", profile.Email, profile.FirstName, profile.LastName, birthday, profile.Sex, time.Now()).Scan(&newSubjectId)
 	if err != nil {
 		fmt.Println(err)
 		// handle error
@@ -219,7 +225,7 @@ func SaveSubjectPin(db *sql.DB, subjectId int, pinNumber string) {
 
 func GetSubjectProfileById(db *sql.DB, subjectId int) SubjectProfile {
 	var profile SubjectProfile
-	err := db.QueryRow("SELECT first_name, last_name, email, birth_date, password, password_strength, password_entropy, pin_number FROM subjects WHERE id=$1 AND id != 0", subjectId).Scan(&profile.FirstName, &profile.LastName, &profile.Email, &profile.Birthday, &profile.Password, &profile.PasswordStrength, &profile.PasswordEntropy, &profile.PinNumber)
+	err := db.QueryRow("SELECT first_name, last_name, email, birth_date, sex, password, password_strength, password_entropy, pin_number FROM subjects WHERE id=$1 AND id != 0", subjectId).Scan(&profile.FirstName, &profile.LastName, &profile.Email, &profile.Birthday, &profile.Sex, &profile.Password, &profile.PasswordStrength, &profile.PasswordEntropy, &profile.PinNumber)
 	if err != nil {
 		fmt.Println(err)
 		// handle error

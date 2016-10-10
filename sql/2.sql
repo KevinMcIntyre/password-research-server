@@ -47,6 +47,7 @@ CREATE TABLE subjects (
     first_name VARCHAR(50),
     last_name VARCHAR(50),
     birth_date DATE,
+    sex VARCHAR(1),
     creation_date TIMESTAMP,
     notes TEXT,
     CONSTRAINT pk_subjects PRIMARY KEY (id)
