@@ -20,6 +20,7 @@ import (
 	"github.com/KevinMcIntyre/password-research-server/services"
 	"github.com/KevinMcIntyre/password-research-server/utils"
 	"github.com/codegangsta/negroni"
+	"github.com/flosch/pongo2"
 	"github.com/julienschmidt/httprouter"
 	_ "github.com/lib/pq"
 	"github.com/rs/cors"
@@ -1006,10 +1007,34 @@ func exportHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 	w.Write(zippedBytes)
 }
 
+func indexHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var index = pongo2.Must(pongo2.FromFile("./public/dist/index.html"))
+	err := index.ExecuteWriter(getContextMap(), w)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func getContextMap() pongo2.Context {
+	contextMap := make(pongo2.Context)
+	return contextMap
+}
+
+type notFound struct{}
+
+func (n notFound) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var index = pongo2.Must(pongo2.FromFile("./public/dist/index.html"))
+	err := index.ExecuteWriter(getContextMap(), w)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func main() {
 	defer db.Close()
 
 	router := httprouter.New()
+	router.GET("/", indexHandler)
 
 	router.POST("/subject/new", newSubjectHandler)
 	router.GET("/subject/profile/:id", getSubjectHandler)
@@ -1052,6 +1077,12 @@ func main() {
 	router.POST("/trial/submit-image", trialImageSubmitHandler)
 	router.POST("/trial/submit-password", trialPasswordSubmitHandler)
 	router.GET("/export", exportHandler)
+
+	router.RedirectTrailingSlash = true
+
+	notFound := notFound{}
+	router.NotFound = notFound
+	router.MethodNotAllowed = notFound
 
 	n := negroni.New(
 		negroni.NewRecovery(),

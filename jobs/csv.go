@@ -22,7 +22,7 @@ type Subject struct {
 
 type PasswordTrial struct {
 	ID              string `csv:"ID"`
-	SubjectID       string `csv:"EMAIL"`
+	SubjectID       string `csv:"SUBJECT_ID"`
 	AttemptsAllowed string `csv:"ATTEMPTS_ALLOWED"`
 	PassedAuth      string `csv:"PASSED_AUTH"`
 	StartTime       string `csv:"START_TIME"`

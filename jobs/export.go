@@ -89,19 +89,19 @@ func ExportData(db *sql.DB, timeString string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	go saveSubjectImages(dirName, subjectImages)
+	saveSubjectImages(dirName, subjectImages)
 
 	configImages, err := getConfigImages(db)
 	if err != nil {
 		return "", err
 	}
-	go saveConfigImages(dirName, configImages)
+	saveConfigImages(dirName, configImages)
 
 	trialUserImages, err := getTrialUserImages(db)
 	if err != nil {
 		return "", err
 	}
-	go saveTrialUserImages(dirName, trialUserImages)
+	saveTrialUserImages(dirName, trialUserImages)
 
 	err = zipItUp(dirName, dirName+".zip")
 	if err != nil {
