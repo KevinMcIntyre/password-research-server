@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/KevinMcIntyre/password-research-server/jobs"
 	"github.com/KevinMcIntyre/password-research-server/models"
 	"github.com/KevinMcIntyre/password-research-server/services"
@@ -27,6 +28,7 @@ import (
 )
 
 var db *sql.DB = setupDatabase()
+var config Config = ReadConfig("./app-config.toml")
 
 func uploadImageHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var (
@@ -1093,20 +1095,18 @@ func main() {
 
 	// Add CORS support (Cross Origin Resource Sharing)
 	handler := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:3000"},
+		AllowedOrigins: []string{config.CrossOriginAddress},
 		AllowedHeaders: []string{"Origin", "Accept", "Content-Type", "Authorization", "Access-Control-Allow-Origin"},
 	}).Handler(router)
 
 	n.UseHandler(handler)
 
-	n.Run(":7000")
+	n.Run(":" + config.ServerPort)
 }
 
 func setupDatabase() *sql.DB {
-	db_url := os.Getenv("DATABASE_URL")
-	if db_url == "" {
-		db_url = "user=postgres password=password dbname=tupwresearch  sslmode=disable"
-	}
+	db_url := fmt.Sprintf("user=%s password=%s dbname=%s  sslmode=%s",
+		config.DBUser, config.DBPassword, config.DBName, config.DBSSLMode)
 
 	db, err := sql.Open("postgres", db_url)
 
@@ -1116,4 +1116,26 @@ func setupDatabase() *sql.DB {
 	}
 
 	return db
+}
+
+type Config struct {
+	CrossOriginAddress string
+	ServerPort         string
+	DBUser             string
+	DBPassword         string
+	DBName             string
+	DBSSLMode          string
+}
+
+func ReadConfig(configfile string) Config {
+	_, err := os.Stat(configfile)
+	if err != nil {
+		log.Fatal("Config file is missing: ", configfile)
+	}
+
+	var config Config
+	if _, err := toml.DecodeFile(configfile, &config); err != nil {
+		log.Fatal(err)
+	}
+	return config
 }

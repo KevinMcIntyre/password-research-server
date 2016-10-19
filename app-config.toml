@@ -1,0 +1,6 @@
+crossoriginaddress="http://localhost:3000"
+serverport="7000"
+dbuser="postgres"
+dbpassword="password"
+dbname="tupwresearch"
+dbsslmode="disable"

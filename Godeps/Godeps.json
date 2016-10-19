@@ -1,8 +1,13 @@
 {
 	"ImportPath": "github.com/KevinMcIntyre/password-research-server",
-	"GoVersion": "go1.6",
+	"GoVersion": "go1.7",
 	"GodepVersion": "v74",
 	"Deps": [
+		{
+			"ImportPath": "github.com/BurntSushi/toml",
+			"Comment": "v0.2.0-21-g9906417",
+			"Rev": "99064174e013895bbd9b025c31100bd1d9b590ca"
+		},
 		{
 			"ImportPath": "github.com/codegangsta/negroni",
 			"Comment": "v0.1-70-gc7477ad",
@@ -11,6 +16,11 @@
 		{
 			"ImportPath": "github.com/disintegration/imaging",
 			"Rev": "546cb3c5137b3f1232e123a26aa033aade6b3066"
+		},
+		{
+			"ImportPath": "github.com/flosch/pongo2",
+			"Comment": "v1.0-rc1-211-g22499f9",
+			"Rev": "22499f94d3d56c7238591344a6902715d0b8fbbf"
 		},
 		{
 			"ImportPath": "github.com/gocarina/gocsv",
