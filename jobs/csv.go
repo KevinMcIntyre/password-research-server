@@ -9,13 +9,10 @@ import (
 
 type Subject struct {
 	ID               string `csv:"ID"`
-	EMail            string `csv:"EMAIL"`
 	Password         string `csv:"PASSWORD"`
 	PasswordEntropy  string `csv:"PASSWORD_ENTROPY"`
 	PasswordStrength string `csv:"PASSWORD_STRENGTH"`
 	PinNumber        string `csv:"PIN_NUMBER"`
-	FirstName        string `csv:"FIRST_NAME"`
-	LastName         string `csv:"LAST_NAME"`
 	Birthday         string `csv:"BIRTH_DATE"`
 	CreationDate     string `csv:"CREATION_DATE"`
 }
@@ -27,7 +24,6 @@ type PasswordTrial struct {
 	PassedAuth      string `csv:"PASSED_AUTH"`
 	StartTime       string `csv:"START_TIME"`
 	EndTime         string `csv:"END_TIME"`
-	Notes           string `csv:"NOTES"`
 	CreationDate    string `csv:"CREATION_DATE"`
 }
 
@@ -64,7 +60,6 @@ type ImageTrial struct {
 	SubjectID    string `csv:"SUBJECT_ID"`
 	ConfigID     string `csv:"CONFIG_ID"`
 	PassedAuth   string `csv:"PASSED_AUTH"`
-	Notes        string `csv:"NOTES"`
 	CreationDate string `csv:"CREATION_DATE"`
 }
 
@@ -181,10 +176,6 @@ func getAllImageTrialData(db *sql.DB) ([]ImageTrial, error) {
 	id,
 	subject_id,
 	test_config_id,
-	CASE WHEN notes IS NULL
-		THEN ''
-		ELSE notes
-	END AS notes,
 	successful_auth,
 	creation_date
 	FROM image_trial_data WHERE trial_complete = true
@@ -200,7 +191,6 @@ func getAllImageTrialData(db *sql.DB) ([]ImageTrial, error) {
 			&trial.ID,
 			&trial.SubjectID,
 			&trial.ConfigID,
-			&trial.Notes,
 			&trial.PassedAuth,
 			&trial.CreationDate,
 		)
@@ -247,10 +237,6 @@ func getAllSubjectData(db *sql.DB) ([]Subject, error) {
 		THEN ''
 		ELSE id::varchar
 	END AS id,
-	CASE WHEN email IS NULL
-		THEN ''
-		ELSE email
-	END AS email,
 	CASE WHEN password IS NULL
 		THEN ''
 		ELSE password
@@ -267,14 +253,6 @@ func getAllSubjectData(db *sql.DB) ([]Subject, error) {
 		THEN ''
 		ELSE pin_number
 	END AS pin_number,
-	CASE WHEN first_name IS NULL
-		THEN ''
-		ELSE first_name
-	END AS first_name,
-	CASE WHEN last_name IS NULL
-		THEN ''
-		ELSE last_name
-	END AS last_name,
 	CASE WHEN birth_date IS NULL
 		THEN ''
 		ELSE birth_date::varchar
@@ -295,13 +273,10 @@ func getAllSubjectData(db *sql.DB) ([]Subject, error) {
 		var subject Subject
 		err := rows.Scan(
 			&subject.ID,
-			&subject.EMail,
 			&subject.Password,
 			&subject.PasswordEntropy,
 			&subject.PasswordStrength,
 			&subject.PinNumber,
-			&subject.FirstName,
-			&subject.LastName,
 			&subject.Birthday,
 			&subject.CreationDate,
 		)
@@ -344,10 +319,6 @@ func getAllPasswordTrialData(db *sql.DB, isPinNumber bool) ([]PasswordTrial, err
 		THEN ''
 		ELSE end_time::varchar
 	END AS end_time,
-	CASE WHEN notes IS NULL
-		THEN ''
-		ELSE notes
-	END AS notes,
 	CASE WHEN creation_date IS NULL
 		THEN ''
 		ELSE creation_date::varchar
@@ -368,7 +339,6 @@ func getAllPasswordTrialData(db *sql.DB, isPinNumber bool) ([]PasswordTrial, err
 			&trial.PassedAuth,
 			&trial.StartTime,
 			&trial.EndTime,
-			&trial.Notes,
 			&trial.CreationDate,
 		)
 		if err != nil {

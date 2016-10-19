@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"strings"
+
 	"github.com/BurntSushi/toml"
 	"github.com/KevinMcIntyre/password-research-server/jobs"
 	"github.com/KevinMcIntyre/password-research-server/models"
@@ -24,6 +26,7 @@ import (
 	"github.com/flosch/pongo2"
 	"github.com/julienschmidt/httprouter"
 	_ "github.com/lib/pq"
+	"github.com/robfig/cron"
 	"github.com/rs/cors"
 )
 
@@ -1003,6 +1006,20 @@ func exportHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 		return
 	}
 
+	dirPath := "./" + strings.TrimSuffix(pathToZip, ".zip") + "/"
+	err = utils.RemoveContents(dirPath)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	err = os.Remove(dirPath)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	err = os.Remove(pathToZip)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Length", strconv.Itoa(len(zippedBytes)))
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+timeString+".zip"+"\"")
@@ -1033,6 +1050,8 @@ func (n notFound) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	utils.WritePid()
+	initCron()
 	defer db.Close()
 
 	router := httprouter.New()
@@ -1138,4 +1157,21 @@ func ReadConfig(configfile string) Config {
 		log.Fatal(err)
 	}
 	return config
+}
+
+func initCron() {
+	// Clean up the old random images
+	cleanupRandomImages()
+
+	// Set a job to remove the old random images everyday at mightnight
+	c := cron.New()
+	c.AddFunc("@midnight", cleanupRandomImages)
+	c.Start()
+}
+
+func cleanupRandomImages() {
+	db.Exec(`
+		DELETE FROM random_stage_images
+		WHERE creation_date < now() - interval '1 day'
+	`)
 }

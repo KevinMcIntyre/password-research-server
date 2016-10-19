@@ -247,7 +247,7 @@ func getTrialUserImages(db *sql.DB) ([]TrialUserImage, error) {
 func saveSubjectImages(dirName string, subjectImages []SubjectImage) error {
 	os.Mkdir(dirName+"/subject_images", os.ModePerm)
 	for _, img := range subjectImages {
-		imgDirName := dirName + "/subject_images/" + img.SubjectID + "_" + img.SubjectName
+		imgDirName := dirName + "/subject_images/" + img.SubjectID
 		directoryExists, err := utils.FileExists(imgDirName)
 		if err != nil {
 			return err
@@ -279,7 +279,7 @@ func saveConfigImages(dirName string, configImages []ConfigImage) error {
 func saveTrialUserImages(dirName string, trialUserImages []TrialUserImage) error {
 	os.Mkdir(dirName+"/trial_pass_images", os.ModePerm)
 	for _, img := range trialUserImages {
-		imgDirName := dirName + "/trial_pass_images/" + img.TrialID + "_" + img.TrialDate.Format("01-02-2006_15-04-05")
+		imgDirName := dirName + "/trial_pass_images/" + img.TrialID
 		directoryExists, err := utils.FileExists(imgDirName)
 		if err != nil {
 			return err

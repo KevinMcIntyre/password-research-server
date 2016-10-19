@@ -5,8 +5,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"math"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,6 +17,13 @@ import (
 
 	"github.com/disintegration/imaging"
 )
+
+func WritePid() {
+	err := ioutil.WriteFile("SERVER_PID", []byte(strconv.Itoa(os.Getpid())), 0644)
+	if err != nil {
+		log.Fatalf("Error writing SERVER_PID\n")
+	}
+}
 
 func FileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
@@ -134,4 +144,23 @@ func MsToTime(ms string) (time.Time, error) {
 	}
 
 	return time.Unix(0, msInt*int64(time.Millisecond)), nil
+}
+
+func RemoveContents(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
