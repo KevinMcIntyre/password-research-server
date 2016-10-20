@@ -1,4 +1,4 @@
-crossoriginaddress="http://localhost:3000"
+crossoriginaddress=""
 serverport="7000"
 dbuser="postgres"
 dbpassword="password"

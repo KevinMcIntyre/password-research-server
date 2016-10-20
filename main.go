@@ -1124,10 +1124,9 @@ func main() {
 }
 
 func setupDatabase() *sql.DB {
-	db_url := fmt.Sprintf("user=%s password=%s dbname=%s  sslmode=%s",
-		config.DBUser, config.DBPassword, config.DBName, config.DBSSLMode)
-
-	db, err := sql.Open("postgres", db_url)
+	db, err := sql.Open("postgres", fmt.Sprintf("user=%s password=%s dbname=%s  sslmode=%s",
+		config.DBUser, config.DBPassword, config.DBName, config.DBSSLMode),
+	)
 
 	if err != nil {
 		fmt.Println(err)

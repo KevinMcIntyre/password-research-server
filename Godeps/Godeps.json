@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/KevinMcIntyre/password-research-server",
-	"GoVersion": "go1.7",
+	"GoVersion": "go1.6",
 	"GodepVersion": "v74",
 	"Deps": [
 		{
@@ -40,6 +40,11 @@
 			"ImportPath": "github.com/lib/pq/oid",
 			"Comment": "go1.0-cutoff-74-g8ad2b29",
 			"Rev": "8ad2b298cadd691a77015666a5372eae5dbfac8f"
+		},
+		{
+			"ImportPath": "github.com/robfig/cron",
+			"Comment": "v1-28-g3625689",
+			"Rev": "362568997a630e651eaee0f911ceb54652cfd11d"
 		},
 		{
 			"ImportPath": "github.com/rs/cors",
